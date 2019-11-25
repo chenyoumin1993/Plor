@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+i=0
+for((i=0;i<128;i++));
+do
+echo performance > /sys/devices/system/cpu/cpu$i/cpufreq/scaling_governor
+done
