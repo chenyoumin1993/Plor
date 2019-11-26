@@ -87,12 +87,13 @@
 		stats._stats[tid]->name += value;
 
 #define DIS_STATS(tid, name, value) \
-	if (STATS_ENABLE) \
+	if (STATS_ENABLE) { \
 		if (value < MAX_LAT) { \
 			stats._stats[tid]->name[value] += 1; \
 		} else { \
 			stats._stats[tid]->name[MAX_LAT - 1] += 1; \
-		}
+		} \
+	}
 
 #define INC_TMP_STATS(tid, name, value) \
 	if (STATS_ENABLE) \

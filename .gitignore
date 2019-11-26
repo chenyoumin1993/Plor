@@ -29,4 +29,5 @@
 # Executables
 *.exe
 *.out
+rundb
 *.app

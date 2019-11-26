@@ -228,7 +228,7 @@ void Stats::print_lat_distr() {
 	// } 
 	uint64_t total_lat_dis[MAX_LAT];
 	double total_cnt = 0;
-	for (int i = 0; i < g_thread_cnt; ++i)
+	for (uint i = 0; i < g_thread_cnt; ++i)
 		for (int j = 0; j < MAX_LAT; ++j) {
 			total_lat_dis[j] += _stats[i]->lat_dis[j];
 			total_cnt += (double)_stats[i]->lat_dis[j];
