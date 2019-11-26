@@ -250,9 +250,9 @@ void Stats::print_lat_distr() {
 		} else if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
 			printf ("99P\t%d\n", i);
 			p_99 = true;
-		} else if (tmp_cnt / total_cnt > 0.999 && p_990 == false) {
+		} else if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
 			printf ("99.9P\t%d\n", i);
-			p_990 = true;
+			p_999 = true;
 		} 
 	}
 }
