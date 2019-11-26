@@ -11,7 +11,7 @@
 #define PAGE_SIZE					4096 
 #define CL_SIZE						64
 // CPU_FREQ is used to get accurate timing info 
-#define CPU_FREQ 					2.246 	// in GHz/s
+#define CPU_FREQ 					2.460296 	// in GHz/s
 
 // # of transactions to run for warmup
 #define WARMUP						0
@@ -114,7 +114,7 @@
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(1024 * 40)
+#define SYNTH_TABLE_SIZE 			(1024 * 10240)
 #define ZIPF_THETA 					0.6
 #define READ_PERC 					0.9
 #define WRITE_PERC 					0.1
@@ -122,7 +122,7 @@
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
 #define PERC_MULTI_PART				1
-#define REQ_PER_QUERY				16
+#define REQ_PER_QUERY				4
 #define FIELD_PER_TUPLE				10
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
