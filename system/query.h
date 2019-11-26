@@ -13,6 +13,8 @@ public:
 	uint64_t waiting_time;
 	uint64_t part_num;
 	uint64_t * part_to_access;
+	ts_t start_time;
+	ts_t stop_time;
 };
 
 // All the querise for a particular thread.

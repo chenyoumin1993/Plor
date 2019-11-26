@@ -91,7 +91,7 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 	}
 
 	int rid = 0;
-	for (UInt32 tmp = 0; tmp < g_req_per_query; tmp ++) {		
+	for (UInt32 tmp = 0; tmp < g_req_per_query; tmp ++) {	
 		double r;
 		drand48_r(&_query_thd->buffer, &r);
 		ycsb_request * req = &requests[rid];

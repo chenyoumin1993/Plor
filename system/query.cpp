@@ -93,5 +93,6 @@ Query_thd::init(workload * h_wl, int thread_id) {
 base_query * 
 Query_thd::get_next_query() {
 	base_query * query = &queries[q_idx++];
+	query->start_time = get_sys_clock();
 	return query;
 }

@@ -144,6 +144,8 @@ RC thread_t::run() {
 			} else 
 				part_lock_man.unlock(m_txn, m_query->part_to_access, m_query->part_num);
 #endif
+			m_query->stop_time = get_sys_clock();
+			DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
 		}
 		if (rc == Abort) {
 			uint64_t penalty = 0;
@@ -171,7 +173,7 @@ RC thread_t::run() {
 		uint64_t timespan = endtime - starttime;
 		INC_STATS(get_thd_id(), run_time, timespan);
 		INC_STATS(get_thd_id(), latency, timespan);
-		DIS_STATS(get_thd_id(), lat_dis, timespan);
+		// DIS_STATS(get_thd_id(), lat_dis, timespan);
 		//stats.add_lat(get_thd_id(), timespan);
 		if (rc == RCOK) {
 			INC_STATS(get_thd_id(), txn_cnt, 1);
