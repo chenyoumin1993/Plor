@@ -52,8 +52,8 @@ RC ycsb_wl::init_table() {
             row_t * new_row = NULL;
 			uint64_t row_id;
             rc = the_table->get_new_row(new_row, part_id, row_id); 
-            // TODO insertion of last row may fail after the table_size
-            // is updated. So never access the last record in a table
+            // TODO insertion of last row may fail after the table_size 
+            // is updated. So never access the last record in a table 
 			assert(rc == RCOK);
 			uint64_t primary_key = total_row;
 			new_row->set_primary_key(primary_key);
@@ -103,6 +103,8 @@ void ycsb_wl::init_table_parallel() {
 	mem_allocator.unregister();
 }
 
+
+// Each table has a maximum size, fill all the index, and create each row.
 void * ycsb_wl::init_table_slice() {
 	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);
 	// set cpu affinity
@@ -134,6 +136,7 @@ void * ycsb_wl::init_table_slice() {
 			new_row->set_value(fid, value);
 		}
 
+		// Item is in the index, row store the actual data.
 		itemid_t * m_item =
 			(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
 		assert(m_item != NULL);

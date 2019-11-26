@@ -9,6 +9,7 @@ uint64_t ycsb_query::the_n = 0;
 double ycsb_query::denom = 0;
 
 void ycsb_query::init(uint64_t thd_id, workload * h_wl, Query_thd * query_thd) {
+	// This is a specific TX query, called each time generating a new request.
 	_query_thd = query_thd;
 	requests = (ycsb_request *) 
 		mem_allocator.alloc(sizeof(ycsb_request) * g_req_per_query, thd_id);

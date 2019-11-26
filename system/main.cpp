@@ -52,6 +52,7 @@ int main(int argc, char* argv[])
 	// query_queue should be the last one to be initialized!!!
 	// because it collects txn latency
 	query_queue = (Query_queue *) _mm_malloc(sizeof(Query_queue), 64);
+	// Prepare requests for warmup.
 	if (WORKLOAD != TEST)
 		query_queue->init(m_wl);
 	pthread_barrier_init( &warmup_bar, NULL, g_thread_cnt );
@@ -73,7 +74,7 @@ int main(int argc, char* argv[])
 			uint64_t vid = i;
 			pthread_create(&p_thds[i], NULL, f, (void *)vid);
 		}
-		f((void *)(thd_cnt - 1));
+		f((void *)(thd_cnt - 1)); // Er... the main thread also do warmup.
 		for (uint32_t i = 0; i < thd_cnt - 1; i++)
 			pthread_join(p_thds[i], NULL);
 		printf("WARMUP finished!\n");

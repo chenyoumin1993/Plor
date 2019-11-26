@@ -21,6 +21,7 @@
 #define PRT_LAT_DISTR					true	
 #define STATS_ENABLE					true
 #define TIME_ENABLE					true 
+#define MAX_LAT						10000
 
 #define MEM_ALLIGN					8 
 

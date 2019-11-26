@@ -204,23 +204,55 @@ void Stats::print() {
 		total_debug4, // / BILLION,
 		total_debug5  // / BILLION 
 	);
+	
+	// print_dis();
+
 	if (g_prt_lat_distr)
 		print_lat_distr();
 }
 
 void Stats::print_lat_distr() {
-	FILE * outf;
-	if (output_file != NULL) {
-		outf = fopen(output_file, "a");
-		for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) {
-			fprintf(outf, "[all_debug1 thd=%d] ", tid);
-			for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
-				fprintf(outf, "%ld,", _stats[tid]->all_debug1[tnum]);
-			fprintf(outf, "\n[all_debug2 thd=%d] ", tid);
-			for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
-				fprintf(outf, "%ld,", _stats[tid]->all_debug2[tnum]);
-			fprintf(outf, "\n");
+	// FILE * outf;
+	// if (output_file != NULL) {
+	// 	outf = fopen(output_file, "a");
+	// 	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) {
+	// 		fprintf(outf, "[all_debug1 thd=%d] ", tid);
+	// 		for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
+	// 			fprintf(outf, "%ld,", _stats[tid]->all_debug1[tnum]);
+	// 		fprintf(outf, "\n[all_debug2 thd=%d] ", tid);
+	// 		for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
+	// 			fprintf(outf, "%ld,", _stats[tid]->all_debug2[tnum]);
+	// 		fprintf(outf, "\n");
+	// 	}
+	// 	fclose(outf);
+	// } 
+	uint64_t total_lat_dis[MAX_LAT];
+	double total_cnt = 0;
+	for (int i = 0; i < g_thread_cnt; ++i)
+		for (int j = 0; j < MAX_LAT; ++j) {
+			total_lat_dis[j] += _stats[i]->lat_dis[j];
+			total_cnt += (double)_stats[i]->lat_dis[j];
 		}
-		fclose(outf);
-	} 
+
+	double tmp_cnt = 0;
+	bool p_50 = false, p_90 = false, p_95 = false, p_99 = false, p_999 = false;
+	for (int i = 0; i < MAX_LAT; ++i) {
+		tmp_cnt += (double)total_lat_dis[i];
+		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
+			printf ("50P\t%d\n", i);
+			p_50 = true;
+		} else if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
+			printf ("90P\t%d\n", i);
+			p_90 = true;
+		} else if (tmp_cnt / total_cnt > 0.95 && p_95 == false) {
+			printf ("95P\t%d\n", i);
+			p_95 = true;
+		} else if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
+			printf ("99P\t%d\n", i);
+			p_99 = true;
+		} else if (tmp_cnt / total_cnt > 0.999 && p_990 == false) {
+			printf ("99.9P\t%d\n", i);
+			p_990 = true;
+		} 
+	}
 }

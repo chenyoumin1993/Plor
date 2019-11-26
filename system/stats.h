@@ -22,6 +22,8 @@ public:
 	uint64_t debug3;
 	uint64_t debug4;
 	uint64_t debug5;
+
+	uint64_t lat_dis[MAX_LAT]; // us
 	
 	uint64_t latency;
 	uint64_t * all_debug1;

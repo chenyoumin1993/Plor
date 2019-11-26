@@ -15,7 +15,7 @@ RC workload::init() {
 
 RC workload::init_schema(string schema_file) {
     assert(sizeof(uint64_t) == 8);
-    assert(sizeof(double) == 8);	
+    assert(sizeof(double) == 8);
 	string line;
 	ifstream fin(schema_file);
     Catalog * schema;

@@ -33,11 +33,11 @@ RC ycsb_txn_man::run_txn(base_query * query) {
 		int part_id = wl->key_to_part( req->key );
 		bool finish_req = false;
 		UInt32 iteration = 0;
-		while ( !finish_req ) {
-			if (iteration == 0) {
-				// Find a index to the item
+		while ( !finish_req ) { 
+			if (iteration == 0) { // To emulate scan (simply repeat for N times)
+				// Find the item from the index
 				m_item = index_read(_wl->the_index, req->key, part_id);
-			} 
+			}
 #if INDEX_STRUCT == IDX_BTREE
 			else {
 				_wl->the_index->index_next(get_thd_id(), m_item);

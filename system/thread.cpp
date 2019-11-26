@@ -79,10 +79,12 @@ RC thread_t::run() {
 					}
 					if (m_query == NULL && _abort_buffer_empty_slots == 0) {
 						assert(trial == 0);
+						// No avaiable slot, but too much aborted txs, sleep here.
 						M_ASSERT(min_ready_time >= curr_time, "min_ready_time=%ld, curr_time=%ld\n", min_ready_time, curr_time);
 						usleep(min_ready_time - curr_time);
 					}
 					else if (m_query == NULL) {
+						// Otherwise, get a new reuqest (have enough slot, and all )
 						m_query = query_queue->get_next_query( _thd_id );
 					#if CC_ALG == WAIT_DIE
 						m_txn->set_ts(get_next_ts());
@@ -169,6 +171,7 @@ RC thread_t::run() {
 		uint64_t timespan = endtime - starttime;
 		INC_STATS(get_thd_id(), run_time, timespan);
 		INC_STATS(get_thd_id(), latency, timespan);
+		DIS_STATS(get_thd_id(), lat_dis, timespan);
 		//stats.add_lat(get_thd_id(), timespan);
 		if (rc == RCOK) {
 			INC_STATS(get_thd_id(), txn_cnt, 1);
