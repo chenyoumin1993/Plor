@@ -148,6 +148,7 @@ RC thread_t::run() {
 			DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
 		}
 		if (rc == Abort) {
+			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;
 			if (ABORT_PENALTY != 0)  {
 				double r;

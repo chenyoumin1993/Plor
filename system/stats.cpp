@@ -253,8 +253,13 @@ void Stats::print_lat_distr() {
 			printf ("%d\t", i);
 			p_99 = true;
 		} else if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
-			printf ("%d\n", i);
+			printf ("%d\t", i);
 			p_999 = true;
 		} 
 	}
+	uint64_t cnt = 0;
+	for (uint  i = 0; i < g_thread_cnt; ++i) {
+		cnt += _stats[i]->abort_cnt1;
+	}
+	printf("%lld\n", (long long)cnt);
 }
