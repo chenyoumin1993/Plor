@@ -11,9 +11,13 @@ void Row_lock::init(row_t * row) {
 	waiters_tail = NULL;
 	owner_cnt = 0;
 	waiter_cnt = 0;
-
+#ifdef USE_SPINLOCK
+	latch = new pthread_spinlock_t;
+	pthread_spin_init(latch, 0);
+#else
 	latch = new pthread_mutex_t;
 	pthread_mutex_init(latch, NULL);
+#endif
 	
 	lock_type = LOCK_NONE;
 	blatch = false;
@@ -33,7 +37,11 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
+#ifdef USE_SPINLOCK
+		pthread_spin_lock( latch );
+#else
 		pthread_mutex_lock( latch );
+#endif
 	assert(owner_cnt <= g_thread_cnt);
 	assert(waiter_cnt < g_thread_cnt);
 #if DEBUG_ASSERT
@@ -156,7 +164,11 @@ final:
 	if (g_central_man)
 		glob_manager->release_row(_row);
 	else
+#ifdef USE_SPINLOCK
+		pthread_spin_unlock( latch );
+#else
 		pthread_mutex_unlock( latch );
+#endif
 
 	return rc;
 }
@@ -167,7 +179,11 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
+#ifdef USE_SPINLOCK
+		pthread_spin_lock( latch );
+#else
 		pthread_mutex_lock( latch );
+#endif
 
 	// Try to find the entry in the owners
 	LockEntry * en = owners;
@@ -222,7 +238,11 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (g_central_man)
 		glob_manager->release_row(_row);
 	else
+#ifdef USE_SPINLOCK
+		pthread_spin_unlock( latch );
+#else
 		pthread_mutex_unlock( latch );
+#endif
 
 	return RCOK;
 }

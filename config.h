@@ -5,6 +5,8 @@
 #define ZIPF_THETA 0.99
 #define READ_PERC 1
 #define WRITE_PERC 0
+
+#define USE_SPINLOCK 1
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
