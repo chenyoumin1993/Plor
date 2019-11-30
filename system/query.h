@@ -15,6 +15,7 @@ public:
 	uint64_t * part_to_access;
 	ts_t start_time;
 	ts_t stop_time;
+	uint64_t abort_cnt = 0;
 };
 
 // All the querise for a particular thread.

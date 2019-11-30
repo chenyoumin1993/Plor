@@ -31,6 +31,8 @@ void thread_t::set_host_cid(uint64_t cid) { _host_cid = cid; }
 uint64_t thread_t::get_cur_cid() { return _cur_cid; }
 void thread_t::set_cur_cid(uint64_t cid) {_cur_cid = cid; }
 
+int64_t starttime1, endtime1;
+
 RC thread_t::run() {
 #if !NOGRAPHITE
 	_thd_id = CarbonGetTileId();
@@ -69,6 +71,8 @@ RC thread_t::run() {
 						for (int i = 0; i < _abort_buffer_size; i++) {
 							if (_abort_buffer[i].query != NULL && curr_time > _abort_buffer[i].ready_time) {
 								m_query = _abort_buffer[i].query;
+								// m_query->stop_time = get_sys_clock();
+								// DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
 								_abort_buffer[i].query = NULL;
 								_abort_buffer_empty_slots ++;
 								break;
@@ -132,10 +136,13 @@ RC thread_t::run() {
 		if (rc == RCOK) 
 		{
 #if CC_ALG != VLL
-			if (WORKLOAD == TEST)
+			if (WORKLOAD == TEST) {
 				rc = runTest(m_txn);
-			else 
+			} else {
+				starttime1 = get_server_clock();
 				rc = m_txn->run_txn(m_query);
+				endtime1 = get_server_clock();
+			}
 #endif
 #if CC_ALG == HSTORE
 			if (WORKLOAD == TEST) {
@@ -144,10 +151,9 @@ RC thread_t::run() {
 			} else 
 				part_lock_man.unlock(m_txn, m_query->part_to_access, m_query->part_num);
 #endif
-			m_query->stop_time = get_sys_clock();
-			DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
 		}
 		if (rc == Abort) {
+			m_query->abort_cnt += 1;
 			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;
 			if (ABORT_PENALTY != 0)  {
@@ -161,6 +167,7 @@ RC thread_t::run() {
 				assert(_abort_buffer_empty_slots > 0);
 				for (int i = 0; i < _abort_buffer_size; i ++) {
 					if (_abort_buffer[i].query == NULL) {
+						// m_query->start_time = get_sys_clock();
 						_abort_buffer[i].query = m_query;
 						_abort_buffer[i].ready_time = get_sys_clock() + penalty;
 						_abort_buffer_empty_slots --;
@@ -169,7 +176,15 @@ RC thread_t::run() {
 				}
 			}
 		}
-
+		if (rc == RCOK){
+			m_query->stop_time = get_sys_clock();
+			if (m_query->abort_cnt >= 0)
+				DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
+			if ((m_query->stop_time - m_query->start_time) / 1000 > 0) {
+				DIS_STATS(get_thd_id(), abort_dis, m_query->abort_cnt);
+			}
+		}
+		// DIS_STATS(get_thd_id(), lat_dis, ((endtime1 - starttime1) / 1000));
 		ts_t endtime = get_sys_clock();
 		uint64_t timespan = endtime - starttime;
 		INC_STATS(get_thd_id(), run_time, timespan);

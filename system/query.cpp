@@ -45,6 +45,7 @@ Query_queue::init_per_thread(int thread_id) {
 base_query * 
 Query_queue::get_next_query(uint64_t thd_id) { 	
 	base_query * query = all_queries[thd_id]->get_next_query();
+	query->abort_cnt = 0;
 	return query;
 }
 

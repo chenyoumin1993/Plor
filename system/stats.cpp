@@ -243,20 +243,64 @@ void Stats::print_lat_distr() {
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
 			printf ("%d\t", i);
 			p_50 = true;
-		} else if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
+		}
+		if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
 			printf ("%d\t", i);
 			p_90 = true;
-		} else if (tmp_cnt / total_cnt > 0.95 && p_95 == false) {
+		}
+		if (tmp_cnt / total_cnt > 0.95 && p_95 == false) {
 			printf ("%d\t", i);
 			p_95 = true;
-		} else if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
+		}
+		if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
 			printf ("%d\t", i);
 			p_99 = true;
-		} else if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
+		}
+		if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
 			printf ("%d\t", i);
 			p_999 = true;
 		} 
 	}
+	printf("|\t");
+	uint64_t total_abt_dis[MAX_LAT];
+	double total_abt = 0;
+	for (uint i = 0; i < g_thread_cnt; ++i)
+		for (int j = 0; j < MAX_LAT; ++j) {
+			total_abt_dis[j] += _stats[i]->abort_dis[j];
+			total_abt += (double)_stats[i]->abort_dis[j];
+		}
+
+	double abt_cnt = 0;
+	p_50 = false;
+	p_90 = false;
+	p_95 = false;
+	p_99 = false;
+	p_999 = false;
+	for (int i = 0; i < MAX_LAT; ++i) {
+		abt_cnt += (double)total_abt_dis[i];
+		if (abt_cnt / total_abt > 0.5 && p_50 == false) {
+			printf ("%d\t", i);
+			p_50 = true;
+		}
+		if (abt_cnt / total_abt > 0.9 && p_90 == false) {
+			printf ("%d\t", i);
+			p_90 = true;
+		}
+		if (abt_cnt / total_abt > 0.95 && p_95 == false) {
+			printf ("%d\t", i);
+			p_95 = true;
+		}
+		if (abt_cnt / total_abt > 0.99 && p_99 == false) {
+			printf ("%d\t", i);
+			p_99 = true;
+		}
+		if (abt_cnt / total_abt > 0.999 && p_999 == false) {
+			printf ("%d\t", i);
+			p_999 = true;
+		} 
+	}
+
+	printf("|\t");
 	uint64_t cnt = 0;
 	for (uint  i = 0; i < g_thread_cnt; ++i) {
 		cnt += _stats[i]->abort_cnt1;

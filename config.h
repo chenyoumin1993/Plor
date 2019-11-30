@@ -1,12 +1,12 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define THREAD_CNT 36
-#define CC_ALG HEKATON
-#define ZIPF_THETA 0.99
+#define CC_ALG OCC
+#define ZIPF_THETA 0.5
 #define READ_PERC 1
 #define WRITE_PERC 0
 
-#define USE_SPINLOCK 1
+// #define USE_SPINLOCK 1
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
@@ -26,7 +26,7 @@
 #define PRT_LAT_DISTR					true	
 #define STATS_ENABLE					true
 #define TIME_ENABLE					true 
-#define MAX_LAT						10000
+#define MAX_LAT						100000
 
 #define MEM_ALLIGN					8 
 
@@ -114,7 +114,7 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN				16
 #define QUERY_INTVL 				1UL
-#define MAX_TXN_PER_PART 			100000
+#define MAX_TXN_PER_PART 			50000
 #define FIRST_PART_LOCAL 			true
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====

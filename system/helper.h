@@ -219,7 +219,6 @@ private:
 };
 
 inline void set_affinity(uint64_t thd_id) {
-	return;
 	/*
 	// TOOD. the following mapping only works for swarm
 	// which has 4-socket, 10 physical core per socket, 
