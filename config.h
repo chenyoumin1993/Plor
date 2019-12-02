@@ -2,9 +2,9 @@
 #define _CONFIG_H_
 #define THREAD_CNT 36
 #define CC_ALG OCC
-#define ZIPF_THETA 0.5
-#define READ_PERC 1
-#define WRITE_PERC 0
+#define ZIPF_THETA 0.99
+#define READ_PERC 0.5
+#define WRITE_PERC .5
 
 // #define USE_SPINLOCK 1
 /***********************************************/

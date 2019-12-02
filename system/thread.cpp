@@ -85,7 +85,14 @@ RC thread_t::run() {
 						assert(trial == 0);
 						// No avaiable slot, but too much aborted txs, sleep here.
 						M_ASSERT(min_ready_time >= curr_time, "min_ready_time=%ld, curr_time=%ld\n", min_ready_time, curr_time);
-						usleep(min_ready_time - curr_time);
+						// starttime1 = get_sys_clock();
+						usleep((min_ready_time - curr_time));
+						// while ((curr_time) < min_ready_time) {
+						// 	curr_time = get_sys_clock();
+						// }
+						// endtime1 = get_sys_clock();
+						// DIS_STATS(get_thd_id(), lat_dis, (endtime1 - starttime1)/100);
+						// DIS_STATS(get_thd_id(), lat_dis, (min_ready_time - curr_time));
 					}
 					else if (m_query == NULL) {
 						// Otherwise, get a new reuqest (have enough slot, and all )
