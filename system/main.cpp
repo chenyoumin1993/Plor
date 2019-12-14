@@ -11,8 +11,10 @@
 #include "vll.h"
 
 void * f(void *);
+void * epoch(void *);
 
 thread_t ** m_thds;
+bool finished = false;
 
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -46,6 +48,7 @@ int main(int argc, char* argv[])
 	
 	uint64_t thd_cnt = g_thread_cnt;
 	pthread_t p_thds[thd_cnt - 1];
+	pthread_t e;
 	m_thds = new thread_t * [thd_cnt];
 	for (uint32_t i = 0; i < thd_cnt; i++)
 		m_thds[i] = (thread_t *) _mm_malloc(sizeof(thread_t), 64);
@@ -70,6 +73,7 @@ int main(int argc, char* argv[])
 
 	if (WARMUP > 0){
 		// printf("WARMUP start!\n");
+		pthread_create(&e, NULL, epoch, (void *)0);
 		for (uint32_t i = 0; i < thd_cnt - 1; i++) {
 			uint64_t vid = i;
 			pthread_create(&p_thds[i], NULL, f, (void *)vid);
@@ -79,6 +83,7 @@ int main(int argc, char* argv[])
 			pthread_join(p_thds[i], NULL);
 		// printf("WARMUP finished!\n");
 	}
+	finished = true;
 	warmup_finish = true;
 	pthread_barrier_init( &warmup_bar, NULL, g_thread_cnt );
 #ifndef NOGRAPHITE
@@ -88,6 +93,8 @@ int main(int argc, char* argv[])
 
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
+	finished = false;
+	pthread_create(&e, NULL, epoch, (void *)0);
 	for (uint32_t i = 0; i < thd_cnt - 1; i++) {
 		uint64_t vid = i;
 		pthread_create(&p_thds[i], NULL, f, (void *)vid);
@@ -96,6 +103,7 @@ int main(int argc, char* argv[])
 	for (uint32_t i = 0; i < thd_cnt - 1; i++) 
 		pthread_join(p_thds[i], NULL);
 	// int64_t endtime = get_server_clock();
+	finished = true;
 	
 	if (WORKLOAD != TEST) {
 		// printf("PASS! SimTime = %ld\n", endtime - starttime);
@@ -111,4 +119,11 @@ void * f(void * id) {
 	uint64_t tid = (uint64_t)id;
 	m_thds[tid]->run();
 	return NULL;
+}
+
+void * epoch(void * id) {
+	while (!finished) {
+		usleep(EPOCH_LENGTH);
+		epoch_cnt += 1;
+	}
 }

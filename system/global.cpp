@@ -59,6 +59,11 @@ double g_perc_payment = PERC_PAYMENT;
 bool g_wh_update = WH_UPDATE;
 char * output_file = NULL;
 
+#ifdef USE_EPOCH
+uint64_t epoch_cnt = 0;
+UInt32 epoch_length = EPOCH_LENGTH;
+#endif
+
 map<string, string> g_params;
 
 #if TPCC_SMALL

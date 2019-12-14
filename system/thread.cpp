@@ -61,6 +61,7 @@ RC thread_t::run() {
 	while (true) {
 		ts_t starttime = get_sys_clock();
 		if (WORKLOAD != TEST) {
+#ifndef USE_EPOCH
 			int trial = 0;
 			if (_abort_buffer_enable) {
 				m_query = NULL;
@@ -108,6 +109,25 @@ RC thread_t::run() {
 				if (rc == RCOK)
 					m_query = query_queue->get_next_query( _thd_id );
 			}
+#else
+			m_query = NULL;
+			if (local_epoch_cnt != epoch_cnt) {
+				// epoch changes, try to fetch the aborted TXs from the _epoch_buffer first;
+				if (_epoch_buffer.size() > 0) {
+					m_query = _epoch_buffer.front();
+					_epoch_buffer.pop();
+				} else if (_epoch_buffer.size() == 0) {
+					// No aborted TXs, update local epoch.
+					local_epoch_cnt = epoch_cnt;
+				}
+			}
+			if (m_query == NULL) {
+				m_query = query_queue->get_next_query( _thd_id );
+			#if CC_ALG == WAIT_DIE
+				m_txn->set_ts(get_next_ts());
+			#endif
+			}
+#endif
 		}
 		INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
@@ -146,9 +166,9 @@ RC thread_t::run() {
 			if (WORKLOAD == TEST) {
 				rc = runTest(m_txn);
 			} else {
-				starttime1 = get_server_clock();
+				// starttime1 = get_server_clock();
 				rc = m_txn->run_txn(m_query);
-				endtime1 = get_server_clock();
+				// endtime1 = get_server_clock();
 			}
 #endif
 #if CC_ALG == HSTORE
@@ -163,6 +183,7 @@ RC thread_t::run() {
 			m_query->abort_cnt += 1;
 			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;
+#ifndef USE_EPOCH
 			if (ABORT_PENALTY != 0)  {
 				double r;
 				drand48_r(&buffer, &r);
@@ -182,6 +203,10 @@ RC thread_t::run() {
 					}
 				}
 			}
+#else
+			// Put the aborted TX in _epoch_buffer.
+			_epoch_buffer.push(m_query);
+#endif
 		}
 		if (rc == RCOK){
 			m_query->stop_time = get_sys_clock();

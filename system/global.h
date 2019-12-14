@@ -122,7 +122,11 @@ typedef uint64_t txn_t;
 typedef uint64_t rid_t; // row id
 typedef uint64_t pgid_t; // page id
 
-
+// EPOCH
+#ifdef USE_EPOCH
+extern uint64_t epoch_cnt;
+extern UInt32 epoch_length;
+#endif
 
 /* INDEX */
 enum latch_t {LATCH_EX, LATCH_SH, LATCH_NONE};
