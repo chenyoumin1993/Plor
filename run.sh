@@ -7,12 +7,13 @@ replace()
 # CC
 #CC_AGS=(WAIT_DIE NO_WAIT DL_DETECT TIMESTAMP MVCC HEKATON HSTORE OCC VLL TICTOC SILO)
 #CC_AGS=(WAIT_DIE NO_WAIT DL_DETECT MVCC OCC) # HSTORE)
-CC_AGS=(SILO)
-#CC_AGS=(TICTOC)
-#MAX_THD=(1 4 8 12 16 20 24 28 32 36) #40 44 48 52 56 60 64)
-MAX_THD=(36)
-ZIPF=(0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 0.9 0.95 0.99)
-READ=(0.5)
+#CC_AGS=(WAIT_DIE NO_WAIT DL_DETECT SILO TICTOC)
+CC_AGS=(WAIT_DIE SILO)
+MAX_THD=(1 4 8 12 16 20 24 28 32 36) #40 44 48 52 56 60 64)
+#MAX_THD=(36)
+#ZIPF=(0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 0.9 0.95 0.99)
+ZIPF=(0.5 0.8 0.9)
+READ=(0.1 0.5 0.9)
 
 #CC_AGS=(WAIT_DIE)
 #MAX_THD=1
@@ -20,20 +21,20 @@ READ=(0.5)
 #READ=(0)
 
 printf "Rd\tWt\tZip\tT\tCC\tTP\tP50\tP90\tP99\tP999\tAbt\n"
+for zip in ${ZIPF[@]}
+do
 for rd in ${READ[@]}
 do
 for cc in ${CC_AGS[@]}
 do
 for t in ${MAX_THD[@]}
 do
-for zip in ${ZIPF[@]}
-do
 	replace 3 "#define THREAD_CNT $t" config.h
 	replace 4 "#define CC_ALG $cc" config.h
 	replace 5 "#define ZIPF_THETA $zip" config.h
 	replace 6 "#define READ_PERC $rd" config.h
 	wt=`echo 1 - $rd | bc`
-	replace 7 "#define WRITE_PERC $wt" config.h
+	replace 7 "#define WRITE_PERC 0$wt" config.h
 	printf "%.2f\t%.2f\t%.2f\t%d\t%s\t" $rd $wt $zip $t $cc
 	make clean &> /dev/null
 	make -j &> /dev/null

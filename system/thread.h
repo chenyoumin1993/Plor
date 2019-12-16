@@ -43,7 +43,7 @@ private:
 	int _abort_buffer_empty_slots;
 	bool _abort_buffer_enable;
 #ifdef USE_EPOCH
-	std::queue<base_query*> _epoch_buffer;
+	std::queue<base_query*> *_epoch_buffer;
 	uint64_t local_epoch_cnt = 0;
 #endif
 };

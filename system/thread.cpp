@@ -23,6 +23,10 @@ void thread_t::init(uint64_t thd_id, workload * workload) {
 		_abort_buffer[i].query = NULL;
 	_abort_buffer_empty_slots = _abort_buffer_size;
 	_abort_buffer_enable = (g_params["abort_buffer_enable"] == "true");
+#ifdef USE_EPOCH
+	// _epoch_buffer.reserve(1024 * 1024);
+	_epoch_buffer = new std::queue<base_query*>;
+#endif
 }
 
 uint64_t thread_t::get_thd_id() { return _thd_id; }
@@ -113,12 +117,15 @@ RC thread_t::run() {
 			m_query = NULL;
 			if (local_epoch_cnt != epoch_cnt) {
 				// epoch changes, try to fetch the aborted TXs from the _epoch_buffer first;
-				if (_epoch_buffer.size() > 0) {
-					m_query = _epoch_buffer.front();
-					_epoch_buffer.pop();
-				} else if (_epoch_buffer.size() == 0) {
+				int size = _epoch_buffer->size();
+				if (size > 0) {
+					m_query = _epoch_buffer->front();
+					_epoch_buffer->pop();
+				} else if (size == 0) {
 					// No aborted TXs, update local epoch.
 					local_epoch_cnt = epoch_cnt;
+				} else {
+					// printf("error %d - %d.\n", _thd_id, size);
 				}
 			}
 			if (m_query == NULL) {
@@ -205,7 +212,7 @@ RC thread_t::run() {
 			}
 #else
 			// Put the aborted TX in _epoch_buffer.
-			_epoch_buffer.push(m_query);
+			_epoch_buffer->push(m_query);
 #endif
 		}
 		if (rc == RCOK){
