@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define THREAD_CNT 36
-#define CC_ALG DL_DETECT
+#define CC_ALG TICTOC
 #define ZIPF_THETA 0.9
 #define READ_PERC 0.5
 #define WRITE_PERC 0.5
@@ -11,7 +11,7 @@
 
 #define LONG_TX_ENABLE 1
 #define LONG_TX_PERC 0.00125
-#define LONG_TX_EXEC_TIME 10
+#define LONG_TX_EXEC_TIME 1000
 
 // #define USE_SPINLOCK 1
 /***********************************************/
