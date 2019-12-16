@@ -1,6 +1,6 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define THREAD_CNT 36
+#define THREAD_CNT 64
 #define CC_ALG SILO
 #define ZIPF_THETA 0.9
 #define READ_PERC 0.9
