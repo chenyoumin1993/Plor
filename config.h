@@ -9,6 +9,10 @@
 #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000
 
+#define LONG_TX_ENABLE 1
+#define LONG_TX_PERC 0.00125
+#define LONG_TX_EXEC_TIME 10
+
 // #define USE_SPINLOCK 1
 /***********************************************/
 // Simulation + Hardware

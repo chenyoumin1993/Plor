@@ -16,6 +16,7 @@ public:
 	ts_t start_time;
 	ts_t stop_time;
 	uint64_t abort_cnt = 0;
+	uint64_t exec_time = 0;
 };
 
 // All the querise for a particular thread.

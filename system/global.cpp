@@ -45,6 +45,7 @@ double g_perc_multi_part = PERC_MULTI_PART;
 double g_read_perc = READ_PERC;
 double g_write_perc = WRITE_PERC;
 double g_zipf_theta = ZIPF_THETA;
+double g_perc_long_tx = LONG_TX_PERC;
 bool g_prt_lat_distr = PRT_LAT_DISTR;
 UInt32 g_part_cnt = PART_CNT;
 UInt32 g_virtual_part_cnt = VIRTUAL_PART_CNT;

@@ -16,6 +16,12 @@
 #include "mem_alloc.h"
 #include "query.h"
 
+// void micro_sleep(int us) {
+// 	ts_t T1 = T2 = get_sys_clock();
+// 	while (((T2 - T1) / 1000) < us)
+// 		T2 = get_sys_clock();
+// }
+
 void ycsb_txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	txn_man::init(h_thd, h_wl, thd_id);
 	_wl = (ycsb_wl *) h_wl;
@@ -74,13 +80,15 @@ RC ycsb_txn_man::run_txn(base_query * query) {
 //					}
                 } 
             }
-
-
 			iteration ++;
 			if (req->rtype == RD || req->rtype == WR || iteration == req->scan_len)
 				finish_req = true;
 		}
 	}
+#ifdef LONG_TX_ENABLE
+	if (m_query->exec_time > 0)
+		usleep(m_query->exec_time); // May be not accurate.
+#endif
 	rc = RCOK;
 final:
 	// Execute the loose ends (validation in OCC, etc.).

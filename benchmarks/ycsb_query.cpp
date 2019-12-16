@@ -66,7 +66,9 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 	part_num = 0;
 	double r = 0;
 	int64_t rint64 = 0;
+	double exec = 0;
 	drand48_r(&_query_thd->buffer, &r);
+	drand48_r(&_query_thd->buffer, &exec);
 	lrand48_r(&_query_thd->buffer, &rint64);
 	if (r < g_perc_multi_part) {
 		for (UInt32 i = 0; i < g_part_per_txn; i++) {
@@ -89,6 +91,10 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 		else
 			part_to_access[0] = rint64 % g_part_cnt;
 	}
+
+	if (exec < g_perc_long_tx)
+		exec_time = LONG_TX_EXEC_TIME;
+
 
 	int rid = 0;
 	for (UInt32 tmp = 0; tmp < g_req_per_query; tmp ++) {	
