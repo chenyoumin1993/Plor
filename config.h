@@ -1,12 +1,12 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define THREAD_CNT 64
-#define CC_ALG SILO
+#define THREAD_CNT 36
+#define CC_ALG DL_DETECT
 #define ZIPF_THETA 0.9
-#define READ_PERC 0.9
-#define WRITE_PERC 0.1
+#define READ_PERC 0.5
+#define WRITE_PERC 0.5
 
-#define USE_EPOCH 1
+// #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000
 
 #define LONG_TX_ENABLE 1
