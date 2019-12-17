@@ -102,9 +102,9 @@ RC thread_t::run() {
 					else if (m_query == NULL) {
 						// Otherwise, get a new reuqest (have enough slot, and all )
 						m_query = query_queue->get_next_query( _thd_id );
-					#if CC_ALG == WAIT_DIE
-						m_txn->set_ts(get_next_ts());
-					#endif
+					// #if CC_ALG == WAIT_DIE
+					// 	m_txn->set_ts(get_next_ts());
+					// #endif
 					}
 					if (m_query != NULL)
 						break;
@@ -147,7 +147,8 @@ RC thread_t::run() {
 		if ((CC_ALG == HSTORE && !HSTORE_LOCAL_TS)
 				|| CC_ALG == MVCC 
 				|| CC_ALG == HEKATON
-				|| CC_ALG == TIMESTAMP) 
+				|| CC_ALG == TIMESTAMP
+				|| CC_ALG == WAIT_DIE) 
 			m_txn->set_ts(get_next_ts());
 
 		rc = RCOK;
