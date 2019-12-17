@@ -219,7 +219,7 @@ RC thread_t::run() {
 			m_query->stop_time = get_sys_clock();
 			if (m_query->abort_cnt >= 0)
 				DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
-			if ((m_query->stop_time - m_query->start_time) / 1000 > 0) {
+			if ((m_query->stop_time - m_query->start_time) / 1000 > 0 && m_query->exec_time > 0) {
 				DIS_STATS(get_thd_id(), abort_dis, m_query->abort_cnt);
 			}
 		}
