@@ -150,6 +150,14 @@ RC thread_t::run() {
 				|| CC_ALG == TIMESTAMP
 				|| CC_ALG == WAIT_DIE) 
 			m_txn->set_ts(get_next_ts());
+		if (CC_ALG == WAIT_DIE) {
+			if (m_query->timestamp != 0) {
+				// This is an aborted TX.
+				m_txn->set_ts(m_query->timestamp);
+			} else {
+				m_query->timestamp = m_txn->get_ts();
+			}
+		}
 
 		rc = RCOK;
 #if CC_ALG == HSTORE
