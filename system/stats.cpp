@@ -236,6 +236,11 @@ void Stats::print_lat_distr() {
 			total_cnt += (double)_stats[i]->lat_dis[j];
 		}
 
+	printf("\n");
+	for (int i = 0; i < MAX_LAT; i++)
+		printf("%lld\t", (long long int)total_lat_dis[i]);
+	printf("\n");
+
 	double tmp_cnt = 0;
 	bool p_50 = false, p_90 = false, p_95 = false, p_99 = false, p_999 = false;
 	for (int i = 0; i < MAX_LAT; ++i) {
