@@ -307,8 +307,4 @@ void Stats::print_lat_distr() {
 		cnt += _stats[i]->abort_cnt1;
 	}
 	printf("%lld\n", (long long)cnt);
-	printf("\n");
-	for (int i = 0; i < 1000; i++)
-		printf("%lld\t", (long long int)total_abt_dis[i]);
-	printf("\n");
 }

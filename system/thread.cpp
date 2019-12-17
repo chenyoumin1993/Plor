@@ -91,7 +91,7 @@ RC thread_t::run() {
 						// No avaiable slot, but too much aborted txs, sleep here.
 						M_ASSERT(min_ready_time >= curr_time, "min_ready_time=%ld, curr_time=%ld\n", min_ready_time, curr_time);
 						// starttime1 = get_sys_clock();
-						usleep((min_ready_time - curr_time)/8);
+						usleep((min_ready_time - curr_time));
 						// while ((curr_time) < min_ready_time) {
 						// 	curr_time = get_sys_clock();
 						// }
@@ -102,9 +102,9 @@ RC thread_t::run() {
 					else if (m_query == NULL) {
 						// Otherwise, get a new reuqest (have enough slot, and all )
 						m_query = query_queue->get_next_query( _thd_id );
-					// #if CC_ALG == WAIT_DIE
-					// 	m_txn->set_ts(get_next_ts());
-					// #endif
+					#if CC_ALG == WAIT_DIE
+						m_txn->set_ts(get_next_ts());
+					#endif
 					}
 					if (m_query != NULL)
 						break;
@@ -219,7 +219,7 @@ RC thread_t::run() {
 			m_query->stop_time = get_sys_clock();
 			if (m_query->abort_cnt >= 0)
 				DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
-			if ((m_query->stop_time - m_query->start_time) / 1000 > 0 && m_query->exec_time > 0) {
+			if ((m_query->stop_time - m_query->start_time) / 1000 > 0) {
 				DIS_STATS(get_thd_id(), abort_dis, m_query->abort_cnt);
 			}
 		}
