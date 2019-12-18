@@ -109,8 +109,10 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				}
 				en = en->next;
 			}
+			
 			if (CC_ALG == WOUND_WAIT && canwait) {
 				// T is older than all the owners, wound them.
+				en = owners;
 				while (en != NULL) {
 					en->txn->lock_abort = true;
 					en = en->next;

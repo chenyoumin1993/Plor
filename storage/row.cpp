@@ -200,6 +200,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		if (txn->lock_ready) 
 			rc = RCOK;
 		else if (txn->lock_abort) { 
+			printf("a. ");
 			rc = Abort;
 			return_row(type, txn, NULL);
 		}
