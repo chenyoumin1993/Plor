@@ -136,7 +136,7 @@ RC thread_t::run() {
 		INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
 		if (CC_ALG == WOUND_WAIT)
-			m_txn->need_abort = false;
+			m_txn->lock_abort = false;
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
 //#endif
