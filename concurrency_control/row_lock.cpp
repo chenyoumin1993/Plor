@@ -31,7 +31,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 }
 
 RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
-	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE);
+	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT);
 	RC rc;
 	int part_id =_row->get_part_id();
 	if (g_central_man)
@@ -67,8 +67,11 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 #endif
 
 	bool conflict = conflict_lock(lock_type, type);
-	if (CC_ALG == WAIT_DIE && !conflict) {
-		if (waiters_head && txn->get_ts() < waiters_head->txn->get_ts())
+	if ((CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) && !conflict) {
+		// only allow it to be inserted 
+		// in the wait queue if it is newer than some of them in the wait queue.
+		// if (waiters_head && txn->get_ts() < waiters_head->txn->get_ts())
+		if (waiters_head)
 			conflict = true;
 	}
 	// Some txns coming earlier is waiting. Should also wait.
@@ -88,7 +91,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			waiter_cnt ++;
             txn->lock_ready = false;
             rc = WAIT;
-		} else if (CC_ALG == WAIT_DIE) {
+		} else if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) {
             ///////////////////////////////////////////////////////////
             //  - T is the txn currently running
 			//	IF T.ts < ts of all owners
@@ -106,13 +109,20 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				}
 				en = en->next;
 			}
-			if (canwait) {
+			if (CC_ALG == WOUND_WAIT && canwait) {
+				// T is older than all the owners, wound them.
+				while (en != NULL) {
+					en->txn->need_abort = true;
+					en = en->next;
+				}
+			}
+			if ((CC_ALG == WAIT_DIE && canwait) || (CC_ALG == WOUND_WAIT)) {
 				// insert txn to the right position
-				// the waiter list is always in timestamp order
+				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
 				LockEntry * entry = get_entry();
 				entry->txn = txn;
 				entry->type = type;
-				en = waiters_head;
+				en = waiters_head; // the oldest.
 				while (en != NULL && txn->get_ts() < en->txn->get_ts()) 
 					en = en->next;
 				if (en) {

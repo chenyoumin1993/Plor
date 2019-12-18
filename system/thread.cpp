@@ -130,14 +130,13 @@ RC thread_t::run() {
 			}
 			if (m_query == NULL) {
 				m_query = query_queue->get_next_query( _thd_id );
-			#if CC_ALG == WAIT_DIE
-				m_txn->set_ts(get_next_ts());
-			#endif
 			}
 #endif
 		}
 		INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
+		if (CC_ALG == WOUND_WAIT)
+			m_txn->need_abort = false;
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
 //#endif
@@ -148,9 +147,10 @@ RC thread_t::run() {
 				|| CC_ALG == MVCC 
 				|| CC_ALG == HEKATON
 				|| CC_ALG == TIMESTAMP
-				|| CC_ALG == WAIT_DIE) 
+				|| CC_ALG == WAIT_DIE
+				|| CC_ALG == WOUND_WAIT) 
 			m_txn->set_ts(get_next_ts());
-		if (CC_ALG == WAIT_DIE) {
+		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
 				m_txn->set_ts(m_query->timestamp);

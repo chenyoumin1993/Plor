@@ -85,6 +85,7 @@ RC ycsb_txn_man::run_txn(base_query * query) {
 				finish_req = true;
 		}
 	}
+
 #ifdef LONG_TX_ENABLE
 	if (m_query->exec_time > 0)
 		usleep(m_query->exec_time); // May be not accurate.
