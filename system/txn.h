@@ -76,9 +76,6 @@ public:
 #elif CC_ALG == SILO
 	ts_t 			last_tid;
 #endif
-
-	// For wound-wait
-	bool need_abort = false;
 	
 	// For OCC
 	uint64_t 		start_ts;

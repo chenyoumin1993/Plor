@@ -126,11 +126,6 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	Some of them need to make a local copy (e.g., OCC, write-set in 2PL, etc), 
 	while others can be directly refered to.
 	*/
-
-	// Killed by others.
-	if (CC_ALG == WOUND_WAIT && need_abort)
-		return NULL;
-	
 	if (CC_ALG == HSTORE)
 		return row;
 	uint64_t starttime = get_sys_clock();
