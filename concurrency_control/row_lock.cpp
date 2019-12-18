@@ -110,6 +110,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				en = en->next;
 			}
 			
+			asm volatile ("mfence" ::: "memory");
 			if (CC_ALG == WOUND_WAIT && canwait) {
 				// T is older than all the owners, wound them.
 				en = owners;
@@ -118,6 +119,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 					en = en->next;
 				}
 			}
+			asm volatile ("mfence" ::: "memory");
 			if ((CC_ALG == WAIT_DIE && canwait) || (CC_ALG == WOUND_WAIT)) {
 				// insert txn to the right position
 				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
