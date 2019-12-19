@@ -135,8 +135,15 @@ RC thread_t::run() {
 		}
 		INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
-		if (CC_ALG == WOUND_WAIT)
-			m_txn->lock_abort = false;
+		// if (m_txn->wound_cnt % 10000 == 0)
+		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
+		if (CC_ALG == WOUND_WAIT) {
+			// if (m_txn->wound) m_txn->wound_cnt += 1;
+			// m_txn->last_wound = 0;
+			// m_txn->lock_cnt = 0;
+			// m_txn->cur_owner_id = 0;
+			m_txn->wound = false;
+		}
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
 //#endif

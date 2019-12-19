@@ -16,7 +16,7 @@ public:
     RC lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt);
     RC lock_release(txn_man * txn);
 	
-private:
+// private:
 #ifdef USE_SPINLOCK
 	pthread_spinlock_t * latch;
 #else
@@ -39,6 +39,10 @@ private:
 	LockEntry * owners;	
 	LockEntry * waiters_head;
 	LockEntry * waiters_tail;
+	// int owner_list[10000];
+	// int owner_ts_list[10000];
+	// int release_list[10000];
+	// int oo = 0, rr = 0, tt = 0;
 };
 
 #endif

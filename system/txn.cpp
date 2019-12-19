@@ -126,6 +126,12 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	Some of them need to make a local copy (e.g., OCC, write-set in 2PL, etc), 
 	while others can be directly refered to.
 	*/
+	if (wound) {
+		// lock_cnt += 1;
+		// wound_cnt_discovered1 += 1;
+		// printf("%d wounded-1, cnt = %d\n", get_thd_id(), wound_cnt);
+		return NULL;
+	}
 	if (CC_ALG == HSTORE)
 		return row;
 	uint64_t starttime = get_sys_clock();

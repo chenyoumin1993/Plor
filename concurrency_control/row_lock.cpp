@@ -44,11 +44,11 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 #endif
 	assert(owner_cnt <= g_thread_cnt);
 	assert(waiter_cnt < g_thread_cnt);
-#if DEBUG_ASSERT
 	if (owners != NULL)
 		assert(lock_type == owners->type); 
 	else 
 		assert(lock_type == LOCK_NONE);
+#if DEBUG_ASSERT
 	LockEntry * en = owners;
 	UInt32 cnt = 0;
 	while (en) {
@@ -109,13 +109,16 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				}
 				en = en->next;
 			}
-			
+			assert(owners != NULL);
+			// txn->cur_owner_id = owners->txn->get_thd_id();			
 			asm volatile ("mfence" ::: "memory");
 			if (CC_ALG == WOUND_WAIT && canwait) {
 				// T is older than all the owners, wound them.
 				en = owners;
 				while (en != NULL) {
-					en->txn->lock_abort = true;
+					en->txn->wound = true;
+					// txn->last_wound = en->txn->get_thd_id();
+					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
 					en = en->next;
 				}
 			}
@@ -147,6 +150,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		entry->type = type;
 		entry->txn = txn;
 		STACK_PUSH(owners, entry);
+		// owner_list[oo++] = entry->txn->get_thd_id();
+		// owner_ts_list[tt++] = entry->txn->get_ts();
 		owner_cnt ++;
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
@@ -210,6 +215,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (en) { // find the entry in the owner list
 		if (prev) prev->next = en->next;
 		else owners = en->next;
+		// release_list[rr++] = en->txn->get_thd_id();
 		return_entry(en);
 		owner_cnt --;
 		if (owner_cnt == 0)
@@ -220,6 +226,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 		while (en != NULL && en->txn != txn)
 			en = en->next;
 		ASSERT(en);
+		// release_list[rr++] = en->txn->get_thd_id();
 		LIST_REMOVE(en);
 		if (en == waiters_head)
 			waiters_head = en->next;
@@ -238,8 +245,15 @@ RC Row_lock::lock_release(txn_man * txn) {
 
 	LockEntry * entry;
 	// If any waiter can join the owners, just do it!
+#if CC_ALG != WOUND_WIAT
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
+#else 
+	while (waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
+		LIST_GET_TAIL(waiters_head, waiters_tail, entry);
+#endif
+		// owner_list[oo++] = entry->txn->get_thd_id();
+		// owner_ts_list[tt++] = entry->txn->get_ts();
 		STACK_PUSH(owners, entry);
 		owner_cnt ++;
 		waiter_cnt --;
@@ -247,6 +261,10 @@ RC Row_lock::lock_release(txn_man * txn) {
 		entry->txn->lock_ready = true;
 		lock_type = entry->type;
 	} 
+	
+	if ((owners == NULL) != (owner_cnt == 0)) {
+		printf("%x, %d\n", owners, owner_cnt);
+	}
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
 	if (g_central_man)
