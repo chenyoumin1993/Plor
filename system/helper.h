@@ -54,11 +54,11 @@
 // LIST helper (read from head & write to tail)
 /************************************************/
 #define LIST_GET_HEAD(lhead, ltail, en) {\
-	en = lhead; \
-	lhead = lhead->next; \
-	if (lhead) lhead->prev = NULL; \
-	else ltail = NULL; \
-	en->next = NULL; }
+	en = ltail; \
+	ltail = ltail->prev; \
+	if (ltail) ltail->next = NULL; \
+	else lhead = NULL; \
+	en->prev = NULL; }
 #define LIST_PUT_TAIL(lhead, ltail, en) {\
 	en->next = NULL; \
 	en->prev = NULL; \

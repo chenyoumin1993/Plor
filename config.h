@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define THREAD_CNT 36
-#define CC_ALG WOUND_WAIT
+#define CC_ALG WAIT_DIE 
 #define ZIPF_THETA 0.9
 #define READ_PERC 0.5
 #define WRITE_PERC 0.5
@@ -121,7 +121,7 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN				16
 #define QUERY_INTVL 				1UL
-#define MAX_TXN_PER_PART 			500
+#define MAX_TXN_PER_PART 			100000
 #define FIRST_PART_LOCAL 			true
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
