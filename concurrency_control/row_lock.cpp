@@ -117,7 +117,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				while (en != NULL) {
 					en->txn->wound = true;
 					txn->last_wound = en->txn->get_thd_id();
-					printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
+					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
 					en = en->next;
 				}
 			}
