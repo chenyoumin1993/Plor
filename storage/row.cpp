@@ -162,9 +162,6 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
-			// LockEntry *owner = this->manager->owners;
-			// if (owner != NULL && owner->txn->get_ts() > txn->get_ts() && !owner->txn->wound)
-			// 	owner->txn->wound = true;
 			continue;
 #elif CC_ALG == DL_DETECT	
 			uint64_t last_detect = starttime;
@@ -209,8 +206,10 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 			return_row(type, txn, NULL);
 		}
 		if (txn->wound) {
-			// txn->wound_cnt_discovered +=1;
+		#ifdef DEBUG_WOUND
+			txn->wound_cnt_discovered +=1;
 			// printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);
+		#endif
 			rc = Abort;
 			return_row(type, txn, NULL);
 		}

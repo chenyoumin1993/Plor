@@ -138,10 +138,12 @@ RC thread_t::run() {
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
 		if (CC_ALG == WOUND_WAIT) {
-			// if (m_txn->wound) m_txn->wound_cnt += 1;
-			// m_txn->last_wound = 0;
-			// m_txn->lock_cnt = 0;
-			// m_txn->cur_owner_id = 0;
+		#ifdef DEBUG_WOUND
+			if (m_txn->wound) m_txn->wound_cnt += 1;
+			m_txn->last_wound = 0;
+			m_txn->lock_cnt = 0;
+			m_txn->cur_owner_id = 0;
+		#endif
 			m_txn->wound = false;
 		}
 //#if CC_ALG == VLL

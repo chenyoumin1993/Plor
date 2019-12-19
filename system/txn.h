@@ -79,12 +79,14 @@ public:
 	
 	// For WOUND_WAIT
 	bool wound = false;
-	/*int wound_cnt = 1;
+#ifdef DEBUG_WOUND
+	int wound_cnt = 1;
 	int wound_cnt_discovered = 0;
 	int wound_cnt_discovered1 = 0;
 	int last_wound;
 	int cur_owner_id = 0;
-	int lock_cnt = 0;*/
+	int lock_cnt = 0;
+#endif
 	
 	// For OCC
 	uint64_t 		start_ts;

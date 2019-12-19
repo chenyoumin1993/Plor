@@ -66,14 +66,28 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	assert(cnt == waiter_cnt);
 #endif
 
-	bool conflict = conflict_lock(lock_type, type);
-	if ((CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) && !conflict) {
+	bool conflict;
+#if CC_ALG == WOUND_WAIT
+	if (!wounding) {
+		conflict = conflict_lock(lock_type, type);
+		if (waiters_head && txn->get_ts() > waiters_tail->txn->get_ts())
+			conflict = true;
+	} else {
+		// Someone already wound the lock, just ignore the original lock.
+		conflict = conflict_lock(wound_type, type);
+		if (waiters_head && txn->get_ts() > waiters_tail->txn->get_ts())
+			conflict = true;
+	}
+#else
+	conflict = conflict_lock(lock_type, type);
+	if (CC_ALG == WAIT_DIE && !conflict) {
 		// only allow it to be inserted 
 		// in the wait queue if it is newer than some of them in the wait queue.
 		// if (waiters_head && txn->get_ts() < waiters_head->txn->get_ts())
-		if (waiters_head)
+		if (waiters_head && txn->get_ts() < waiters_head->txn->get_ts())
 			conflict = true;
 	}
+#endif
 	// Some txns coming earlier is waiting. Should also wait.
 	if (CC_ALG == DL_DETECT && waiters_head != NULL)
 		conflict = true;
@@ -109,21 +123,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				}
 				en = en->next;
 			}
-			assert(owners != NULL);
-			// txn->cur_owner_id = owners->txn->get_thd_id();			
-			asm volatile ("mfence" ::: "memory");
-			if (CC_ALG == WOUND_WAIT && canwait) {
-				// T is older than all the owners, wound them.
-				en = owners;
-				while (en != NULL) {
-					en->txn->wound = true;
-					// txn->last_wound = en->txn->get_thd_id();
-					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
-					en = en->next;
-				}
-			}
-			asm volatile ("mfence" ::: "memory");
-			if ((CC_ALG == WAIT_DIE && canwait) || (CC_ALG == WOUND_WAIT)) {
+			
+			if (canwait) {
 				// insert txn to the right position
 				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
 				LockEntry * entry = get_entry();
@@ -144,14 +145,72 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
             }
             else 
                 rc = Abort;
-        }
+        } else if (CC_ALG == WOUND_WAIT) {
+            ///////////////////////////////////////////////////////////
+            //  - T is the txn currently running
+			//	IF T.ts < ts of all owners
+			//		T wound them
+            //  ELSE
+            //      T should wait
+            //////////////////////////////////////////////////////////
+
+			bool wound = true;
+			LockEntry * en = wounding ? wounders : owners;
+			while (en != NULL) {
+                if (en->txn->get_ts() < txn->get_ts()) {
+					wound = false;
+					break;
+				}
+				en = en->next;
+			}
+		#ifdef DEBUG_WOUND
+			txn->cur_owner_id = wounding ? wounders->txn->get_thd_id() : owners->txn->get_thd_id();		
+		#endif	
+			if (wound) {
+				// T is older than all the owners, wound them.
+				asm volatile ("mfence" ::: "memory");
+				en = wounding ? wounders : owners;
+				while (en != NULL) {
+					en->txn->wound = true;
+				#ifdef DEBUG_WOUND
+					txn->last_wound = en->txn->get_thd_id();
+					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
+				#endif
+					en = en->next;
+				}
+				asm volatile ("mfence" ::: "memory");
+				// then put myself in the wound_list
+			} else { // wait
+				// insert txn to the right position 
+				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
+				LockEntry * entry = get_entry();
+				entry->txn = txn;
+				entry->type = type;
+				en = waiters_head; // the oldest.
+				while (en != NULL && txn->get_ts() < en->txn->get_ts()) 
+					en = en->next;
+				if (en) {
+					LIST_INSERT_BEFORE(en, entry);
+					if (en == waiters_head)
+						waiters_head = entry;
+				} else 
+					LIST_PUT_TAIL(waiters_head, waiters_tail, entry);
+				waiter_cnt ++;
+                txn->lock_ready = false;
+                rc = WAIT;
+            }
+            else 
+                rc = Abort;
+		}
 	} else {
 		LockEntry * entry = get_entry();
 		entry->type = type;
 		entry->txn = txn;
 		STACK_PUSH(owners, entry);
-		// owner_list[oo++] = entry->txn->get_thd_id();
-		// owner_ts_list[tt++] = entry->txn->get_ts();
+	#ifdef DEBUG_WOUND
+		owner_list[oo++] = entry->txn->get_thd_id();
+		owner_ts_list[tt++] = entry->txn->get_ts();
+	#endif
 		owner_cnt ++;
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
@@ -215,7 +274,9 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (en) { // find the entry in the owner list
 		if (prev) prev->next = en->next;
 		else owners = en->next;
-		// release_list[rr++] = en->txn->get_thd_id();
+	#ifdef DEBUG_WOUND
+		release_list[rr++] = en->txn->get_thd_id();
+	#endif
 		return_entry(en);
 		owner_cnt --;
 		if (owner_cnt == 0)
@@ -226,7 +287,9 @@ RC Row_lock::lock_release(txn_man * txn) {
 		while (en != NULL && en->txn != txn)
 			en = en->next;
 		ASSERT(en);
-		// release_list[rr++] = en->txn->get_thd_id();
+	#ifdef DEBUG_WOUND
+		release_list[rr++] = en->txn->get_thd_id();
+	#endif
 		LIST_REMOVE(en);
 		if (en == waiters_head)
 			waiters_head = en->next;
@@ -245,15 +308,17 @@ RC Row_lock::lock_release(txn_man * txn) {
 
 	LockEntry * entry;
 	// If any waiter can join the owners, just do it!
-#if CC_ALG != WOUND_WIAT
+#if CC_ALG != WOUND_WAIT
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
 #else 
 	while (waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
 		LIST_GET_TAIL(waiters_head, waiters_tail, entry);
 #endif
-		// owner_list[oo++] = entry->txn->get_thd_id();
-		// owner_ts_list[tt++] = entry->txn->get_ts();
+	#ifdef DEBUG_WOUND
+		owner_list[oo++] = entry->txn->get_thd_id();
+		owner_ts_list[tt++] = entry->txn->get_ts();
+	#endif
 		STACK_PUSH(owners, entry);
 		owner_cnt ++;
 		waiter_cnt --;
@@ -262,9 +327,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 		lock_type = entry->type;
 	} 
 	
-	if ((owners == NULL) != (owner_cnt == 0)) {
-		printf("%x, %d\n", owners, owner_cnt);
-	}
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
 	if (g_central_man)

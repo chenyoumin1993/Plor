@@ -13,6 +13,8 @@
 #define LONG_TX_PERC 0.00125
 #define LONG_TX_EXEC_TIME 0
 
+#define DEBUG_WOUND 1
+
 // #define USE_SPINLOCK 1
 /***********************************************/
 // Simulation + Hardware

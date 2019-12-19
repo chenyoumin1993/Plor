@@ -39,10 +39,17 @@ public:
 	LockEntry * owners;	
 	LockEntry * waiters_head;
 	LockEntry * waiters_tail;
-	// int owner_list[10000];
-	// int owner_ts_list[10000];
-	// int release_list[10000];
-	// int oo = 0, rr = 0, tt = 0;
+
+
+	bool wounding = false;
+	LockEntry *wounders;
+	lock_t wound_type;
+#ifdef DEBUG_WOUND
+	int owner_list[10000];
+	int owner_ts_list[10000];
+	int release_list[10000];
+	int oo = 0, rr = 0, tt = 0;
+#endif
 };
 
 #endif
