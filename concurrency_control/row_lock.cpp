@@ -44,11 +44,11 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 #endif
 	assert(owner_cnt <= g_thread_cnt);
 	assert(waiter_cnt < g_thread_cnt);
-#if DEBUG_ASSERT
 	if (owners != NULL)
 		assert(lock_type == owners->type); 
 	else 
 		assert(lock_type == LOCK_NONE);
+#if DEBUG_ASSERT
 	LockEntry * en = owners;
 	UInt32 cnt = 0;
 	while (en) {
@@ -109,7 +109,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				}
 				en = en->next;
 			}
-			
+			assert(owners != NULL);
+			txn->cur_owner_id = owners->txn->get_thd_id();			
 			asm volatile ("mfence" ::: "memory");
 			if (CC_ALG == WOUND_WAIT && canwait) {
 				// T is older than all the owners, wound them.
@@ -149,6 +150,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		entry->type = type;
 		entry->txn = txn;
 		STACK_PUSH(owners, entry);
+		owner_list[oo++] = txn->get_thd_id();
 		owner_cnt ++;
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
@@ -212,6 +214,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (en) { // find the entry in the owner list
 		if (prev) prev->next = en->next;
 		else owners = en->next;
+		release_list[rr++] = en->txn->get_thd_id();
 		return_entry(en);
 		owner_cnt --;
 		if (owner_cnt == 0)
@@ -222,6 +225,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 		while (en != NULL && en->txn != txn)
 			en = en->next;
 		ASSERT(en);
+		release_list[rr++] = en->txn->get_thd_id();
 		LIST_REMOVE(en);
 		if (en == waiters_head)
 			waiters_head = en->next;
@@ -242,6 +246,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	// If any waiter can join the owners, just do it!
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
+		owner_list[oo++] = txn->get_thd_id();
 		STACK_PUSH(owners, entry);
 		owner_cnt ++;
 		waiter_cnt --;
@@ -249,6 +254,10 @@ RC Row_lock::lock_release(txn_man * txn) {
 		entry->txn->lock_ready = true;
 		lock_type = entry->type;
 	} 
+	
+	if ((owners == NULL) != (owner_cnt == 0)) {
+		printf("%x, %d\n", owners, owner_cnt);
+	}
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
 	if (g_central_man)

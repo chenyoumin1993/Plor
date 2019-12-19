@@ -162,9 +162,9 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
-			LockEntry *owner = this->manager->owners;
-			if (owner != NULL && owner->txn->get_ts() > txn->get_ts() && !owner->txn->wound)
-				owner->txn->wound = true;
+			// LockEntry *owner = this->manager->owners;
+			// if (owner != NULL && owner->txn->get_ts() > txn->get_ts() && !owner->txn->wound)
+			// 	owner->txn->wound = true;
 			continue;
 #elif CC_ALG == DL_DETECT	
 			uint64_t last_detect = starttime;

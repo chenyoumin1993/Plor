@@ -83,6 +83,7 @@ public:
 	int wound_cnt_discovered = 0;
 	int wound_cnt_discovered1 = 0;
 	int last_wound;
+	int cur_owner_id = 0;
 	int lock_cnt = 0;
 	
 	// For OCC

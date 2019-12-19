@@ -39,6 +39,9 @@ public:
 	LockEntry * owners;	
 	LockEntry * waiters_head;
 	LockEntry * waiters_tail;
+	int owner_list[10000];
+	int release_list[10000];
+	int oo = 0, rr = 0;
 };
 
 #endif
