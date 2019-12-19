@@ -77,6 +77,14 @@ public:
 	ts_t 			last_tid;
 #endif
 	
+	// For WOUND_WAIT
+	bool wound = false;
+	int wound_cnt = 1;
+	int wound_cnt_discovered = 0;
+	int wound_cnt_discovered1 = 0;
+	int last_wound;
+	int lock_cnt = 0;
+	
 	// For OCC
 	uint64_t 		start_ts;
 	uint64_t 		end_ts;

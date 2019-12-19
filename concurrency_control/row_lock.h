@@ -16,7 +16,7 @@ public:
     RC lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt);
     RC lock_release(txn_man * txn);
 	
-private:
+// private:
 #ifdef USE_SPINLOCK
 	pthread_spinlock_t * latch;
 #else

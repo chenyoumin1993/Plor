@@ -115,7 +115,9 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				// T is older than all the owners, wound them.
 				en = owners;
 				while (en != NULL) {
-					en->txn->lock_abort = true;
+					en->txn->wound = true;
+					txn->last_wound = en->txn->get_thd_id();
+					printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
 					en = en->next;
 				}
 			}

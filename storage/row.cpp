@@ -157,7 +157,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		uint64_t endtime;
 		txn->lock_abort = false;
 		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
-		while (!txn->lock_ready && !txn->lock_abort) 
+		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) 
 		{
 #if CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
 			continue;
@@ -200,7 +200,12 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		if (txn->lock_ready) 
 			rc = RCOK;
 		else if (txn->lock_abort) { 
-			printf("a. ");
+			rc = Abort;
+			return_row(type, txn, NULL);
+		}
+		if (txn->wound) {
+			txn->wound_cnt_discovered +=1;
+			printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);
 			rc = Abort;
 			return_row(type, txn, NULL);
 		}
