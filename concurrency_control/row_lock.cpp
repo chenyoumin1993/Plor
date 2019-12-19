@@ -150,7 +150,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		entry->type = type;
 		entry->txn = txn;
 		STACK_PUSH(owners, entry);
-		owner_list[oo++] = txn->get_thd_id();
+		owner_list[oo++] = entry->txn->get_thd_id();
+		owner_ts_list[tt++] = entry->txn->get_ts();
 		owner_cnt ++;
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
@@ -246,7 +247,8 @@ RC Row_lock::lock_release(txn_man * txn) {
 	// If any waiter can join the owners, just do it!
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
-		owner_list[oo++] = txn->get_thd_id();
+		owner_list[oo++] = entry->txn->get_thd_id();
+		owner_ts_list[tt++] = entry->txn->get_ts();
 		STACK_PUSH(owners, entry);
 		owner_cnt ++;
 		waiter_cnt --;
