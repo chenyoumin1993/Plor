@@ -146,7 +146,6 @@ RC thread_t::run() {
 			m_txn->cur_owner_id = 0;
 		#endif
 			m_txn->wound = false;
-			m_txn->wound_other = false;
 		}
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);

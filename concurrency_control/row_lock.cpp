@@ -294,7 +294,6 @@ final:
 
 
 RC Row_lock::lock_release(txn_man * txn) {	
-	int road = 0;
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
@@ -322,7 +321,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 		// if (txn->lock_ready != true)
 		// printf("me = %d, wound = %d\n", txn->get_thd_id(), txn->wound);
 		return_entry(en);
-		road = 1;
 		owner_cnt --;
 		if (owner_cnt == 0)
 			lock_type = LOCK_NONE;
@@ -349,7 +347,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 			woundee_cnt --;
 			if (woundee_cnt == 0)
 				woundees = NULL;
-			road = 2;
 			ASSERT(woundee_cnt >= 0);
 			return_entry(en);
 			asm volatile ("mfence" ::: "memory");
@@ -394,7 +391,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 				waiters_tail = en->prev;
 			return_entry(en);
 			waiter_cnt --;
-			road = 3;
 		}
 	}
 	if (owner_cnt == 0)
@@ -406,7 +402,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 
 	LockEntry * entry;
 	// If any waiter can join the owners, just do it!
-	bool add_new_one = false;
 #if CC_ALG != WOUND_WAIT
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
@@ -419,7 +414,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 		owner_ts_list[tt++] = entry->txn->get_ts();
 	#endif
 		STACK_PUSH(owners, entry);
-		add_new_one = true;
 		// printf("me = %d, change waiter (%d) to true, road = %d, woundee_cnt = %d, owner_cnt = %d, waiter_cnt = %d.\n", txn->get_thd_id(), entry->txn->get_thd_id(), road, woundee_cnt, owner_cnt, waiter_cnt);
 		owner_cnt ++;
 		waiter_cnt --;
