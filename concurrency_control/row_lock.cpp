@@ -29,7 +29,7 @@ void Row_lock::init(row_t * row) {
 RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 	uint64_t *txnids = NULL;
 	int txncnt = 0;
-	return lock_get(type, txn, txnids, txncnt, mylock);
+	return lock_get(type, txn, txnids, txncnt);
 }
 
 RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
@@ -169,7 +169,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				while (en != NULL) {
 					en->txn->wound = true;
 					txn->wound_other = true;
-					printf("%d wound %d \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id());
+					// printf("%d wound %d \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id());
 				#ifdef DEBUG_WOUND
 					txn->last_wound = en->txn->get_thd_id();
 					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
@@ -341,7 +341,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 				// ASSERT(owner_cnt != 0);
 				en = owners;
 				while (en != NULL) {
-					printf("me: %d, owner = %d wound = %d, lock_addr = %p, lock = %d\n", txn->get_thd_id(), en->txn->get_thd_id(), txn->wound, &(en->txn->lock_ready), en->txn->lock_ready);
+					// printf("me: %d, owner = %d wound = %d, lock_addr = %p, lock = %d\n", txn->get_thd_id(), en->txn->get_thd_id(), txn->wound, &(en->txn->lock_ready), en->txn->lock_ready);
 					// sleep(1);
 					// if (en->txn->lock_ready != false)
 					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
