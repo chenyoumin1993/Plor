@@ -422,6 +422,9 @@ RC Row_lock::lock_release(txn_man * txn) {
 		lock_type = entry->type;
 	}
 	
+	if (owner_cnt == 0)
+		ASSERT(lock_type == LOCK_NONE);
+		
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
 	if (g_central_man)
