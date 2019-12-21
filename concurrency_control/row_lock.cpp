@@ -364,6 +364,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 						ASSERT(en->txn->lock_ready == true);
 					} else {
 						ASSERT(en->txn->lock_ready == false);
+						en->wound = false;
 					}
 					en->txn->lock_ready = true;
 					en = en->next;
