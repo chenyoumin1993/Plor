@@ -26,13 +26,13 @@ void Row_lock::init(row_t * row) {
 
 }
 
-RC Row_lock::lock_get(lock_t type, txn_man * txn, LockEntry* &mylock) {
+RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 	uint64_t *txnids = NULL;
 	int txncnt = 0;
 	return lock_get(type, txn, txnids, txncnt, mylock);
 }
 
-RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt, LockEntry* &mylock) {
+RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
 	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT);
 	RC rc;
 	int part_id =_row->get_part_id();
@@ -186,7 +186,6 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				// then put myself in the owners but with unready status.
 				ASSERT(owner_cnt == 0);
 				LockEntry * entry = get_entry();
-				mylock = entry;
 				entry->txn = txn;
 				entry->type = type;
 				entry->next = entry->prev = NULL;
@@ -199,12 +198,10 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				// Althrough we wound the owner, we cannot acquire the lock immediately.
 				rc = WAIT;
 				txn->lock_ready = false;
-				mylock->ready = false;
 			} else { // wait
 				// insert txn to the right position 
 				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
 				LockEntry * entry = get_entry();
-				mylock = entry;
 				entry->txn = txn;
 				entry->type = type;
 				en = waiters_head; // the oldest.
@@ -219,12 +216,10 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				waiter_cnt ++;
                 txn->lock_ready = false;
                 rc = WAIT;
-				mylock->ready = false;
             }
 		}
 	} else {
 		LockEntry * entry = get_entry();
-		mylock = entry;
 		entry->type = type;
 		entry->txn = txn;
 		entry->come_from = 1;
@@ -242,10 +237,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			// ASSERT(en->txn->lock_ready == false);
 			rc = WAIT;
 			txn->lock_ready = false;
-			mylock->ready = false;
 		} else {
 			rc = RCOK;
-			mylock->ready = true;
 		}
 	}
 final:
@@ -352,8 +345,8 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// sleep(1);
 					// if (en->txn->lock_ready != false)
 					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
-					if (en->ready == false)
-						en->ready = true;
+					if (en->txn->lock_ready == false)
+						en->txn->lock_ready = true;
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
 					// ASSERT(en->txn->lock_ready == false);
 					en = en->next;
@@ -414,13 +407,8 @@ RC Row_lock::lock_release(txn_man * txn) {
 		entry->come_from = 2;
 		// if (entry->txn->lock_ready != false)
 		// 	printf("me: %d, already change %d to true. (%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
-		if (CC_ALG == WOUND_WAIT) {
-			ASSERT(entry->ready == false);
-			entry->ready = true;
-		} else {
-			ASSERT(entry->txn->lock_ready == false);
-			entry->txn->lock_ready = true;
-		}
+		ASSERT(entry->txn->lock_ready == false);
+		entry->txn->lock_ready = true;
 		// printf("me: %d, change %d to true. (%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
 		lock_type = entry->type;
 	}

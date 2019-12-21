@@ -134,16 +134,15 @@ void row_t::free_row() {
 
 RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	RC rc = RCOK;
-	LockEntry *mylock = NULL;
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT
 	uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
 #if CC_ALG == DL_DETECT
 	uint64_t * txnids;
 	int txncnt; 
-	rc = this->manager->lock_get(lt, txn, txnids, txncnt, mylock);	
+	rc = this->manager->lock_get(lt, txn, txnids, txncnt);	
 #else
-	rc = this->manager->lock_get(lt, txn, mylock);
+	rc = this->manager->lock_get(lt, txn);
 #endif
 
 	if (rc == RCOK) {
@@ -162,13 +161,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		 	// printf("me: %d, wound others, cur_owner = %d. lock = %d\n", txn->get_thd_id(), this->manager->owners->txn->get_thd_id(), txn->lock_ready);
 			// ASSERT(txn->lock_ready == false);
 		}
-	#if CC_ALG != WOUND_WAIT
 		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
-	#else
-		ASSERT(mylock != NULL);
-		printf("me: %d\n", txn->get_thd_id());
-		while (!mylock->ready && !txn->wound) {
-	#endif
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
@@ -209,11 +202,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 				PAUSE
 #endif
 		}
-	#if CC_ALG != WOUND_WAIT
 		if (txn->lock_ready) {
-	#else
-		if (mylock->ready) {
-	#endif
 			rc = RCOK;
 		}
 		else if (txn->lock_abort) { 
