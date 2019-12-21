@@ -354,13 +354,14 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// sleep(1);
 					// if (en->txn->lock_ready != false)
 					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
-					if (en->wound == true) {
-						ASSERT(en->txn->lock_ready == false);
-						en->wound = false;
-						en->txn->lock_ready = true;
-					}
+					// if (en->wound == true) {
+					// 	ASSERT(en->txn->lock_ready == false);
+					// 	en->wound = false;
+					// 	en->txn->lock_ready = true;
+					// }
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
-					// ASSERT(en->txn->lock_ready == false);
+					ASSERT(en->txn->lock_ready == false);
+					en->txn->lock_ready = true;
 					en = en->next;
 				}
 			}
