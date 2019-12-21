@@ -188,6 +188,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				LockEntry * entry = get_entry();
 				entry->txn = txn;
 				entry->type = type;
+				entry->wound = true;
 				entry->next = entry->prev = NULL;
 				entry->come_from = 3;
 				entry->kill_who = woundees->txn->get_thd_id();
@@ -204,6 +205,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				LockEntry * entry = get_entry();
 				entry->txn = txn;
 				entry->type = type;
+				entry->wound = false;
 				en = waiters_head; // the oldest.
 				while (en != NULL && txn->get_ts() < en->txn->get_ts()) 
 					en = en->next;
@@ -222,6 +224,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		LockEntry * entry = get_entry();
 		entry->type = type;
 		entry->txn = txn;
+		entry->wound = false;
 		entry->come_from = 1;
 		STACK_PUSH(owners, entry);
 	#ifdef DEBUG_WOUND
@@ -345,8 +348,11 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// sleep(1);
 					// if (en->txn->lock_ready != false)
 					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
-					if (en->txn->lock_ready == false)
+					if (en->wound == true) {
+						ASSERT(en->txn->lock_ready == false);
 						en->txn->lock_ready = true;
+						en->wound = false;
+					}
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
 					// ASSERT(en->txn->lock_ready == false);
 					en = en->next;
@@ -380,7 +386,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
 #else 
-	while (waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
+	while ((woundee_cnt == 0) waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
 		LIST_GET_TAIL(waiters_head, waiters_tail, entry);
 #endif
 	#ifdef DEBUG_WOUND
