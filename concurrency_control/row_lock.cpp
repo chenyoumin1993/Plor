@@ -316,7 +316,8 @@ RC Row_lock::lock_release(txn_man * txn) {
 	#ifdef DEBUG_WOUND
 		release_list[rr++] = en->txn->get_thd_id();
 	#endif
-		ASSERT(txn->lock_ready == true);
+		if (txn->lock_ready != true)
+		printf("me = %d, wound = %d\n", txn->get_thd_id(), txn->wound);
 		return_entry(en);
 		road = 1;
 		owner_cnt --;
