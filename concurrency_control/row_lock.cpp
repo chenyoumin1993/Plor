@@ -250,6 +250,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			rc = WAIT;
 			txn->lock_ready = false;
 			entry->wound = true;
+			ASSERT(false);
 		} else {
 			txn->lock_ready = true;
 			rc = RCOK;
