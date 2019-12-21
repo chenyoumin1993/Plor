@@ -27,6 +27,8 @@ public:
     pthread_mutex_t * latch;
 #endif
 	bool blatch;
+
+	uint64_t counter = 0;
 	
 	bool 		conflict_lock(lock_t l1, lock_t l2);
 	LockEntry * get_entry();
