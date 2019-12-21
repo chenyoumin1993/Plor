@@ -316,6 +316,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	#ifdef DEBUG_WOUND
 		release_list[rr++] = en->txn->get_thd_id();
 	#endif
+		ASSERT(txn->lock_ready == true);
 		return_entry(en);
 		road = 1;
 		owner_cnt --;
