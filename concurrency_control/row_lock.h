@@ -4,6 +4,7 @@
 struct LockEntry {
     lock_t type;
     txn_man * txn;
+	bool ready;
 	LockEntry * next;
 	LockEntry * prev;
 	bool task;
@@ -16,8 +17,8 @@ class Row_lock {
 public:
 	void init(row_t * row);
 	// [DL_DETECT] txnids are the txn_ids that current txn is waiting for.
-    RC lock_get(lock_t type, txn_man * txn);
-    RC lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt);
+    RC lock_get(lock_t type, txn_man * txn, LockEntry* &mylock);
+    RC lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt, LockEntry* &mylock);
     RC lock_release(txn_man * txn);
 	
 // private:
