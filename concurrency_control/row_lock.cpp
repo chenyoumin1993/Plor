@@ -360,6 +360,9 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// 	en->txn->lock_ready = true;
 					// }
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
+					if (en->wound == false) {
+						ASSERT(en->txn->lock_ready == true);
+					}
 					ASSERT(en->txn->lock_ready == false);
 					en->txn->lock_ready = true;
 					en = en->next;
