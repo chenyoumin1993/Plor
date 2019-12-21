@@ -250,9 +250,9 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			rc = WAIT;
 			txn->lock_ready = false;
 			entry->wound = true;
-			printf("me = %d, waiter_cnt = %d, owner_cnt = %d, woundee_cnt = %d, lock_type = %d\n", 
-			txn->get_thd_id(), waiter_cnt, owner_cnt, woundee_cnt, lock_type);
-			ASSERT(false);
+			// printf("me = %d, waiter_cnt = %d, owner_cnt = %d, woundee_cnt = %d, lock_type = %d\n", 
+			// txn->get_thd_id(), waiter_cnt, owner_cnt, woundee_cnt, lock_type);
+			// ASSERT(false);
 		} else {
 			txn->lock_ready = true;
 			rc = RCOK;

@@ -166,6 +166,11 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
+			endtime = get_sys_clock();
+			if ((endtime - starttime)/1000 > 10000) {
+				printf("%d (%d) wait for %d (%d) timeout.\n", txn->get_thd_id(), txn->get_ts(), 
+				this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts());
+			}
 			continue;
 #elif CC_ALG == DL_DETECT	
 			uint64_t last_detect = starttime;
