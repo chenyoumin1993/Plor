@@ -6,7 +6,7 @@ struct LockEntry {
     txn_man * txn;
 	LockEntry * next;
 	LockEntry * prev;
-	bool task;
+	bool wound;
 	int come_from;
 	int kill_who;
 	int kill_num;
