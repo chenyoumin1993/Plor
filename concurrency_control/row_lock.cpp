@@ -362,8 +362,9 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
 					if (en->wound == false) {
 						ASSERT(en->txn->lock_ready == true);
+					} else {
+						ASSERT(en->txn->lock_ready == false);
 					}
-					ASSERT(en->txn->lock_ready == false);
 					en->txn->lock_ready = true;
 					en = en->next;
 				}
