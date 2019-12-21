@@ -76,7 +76,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		//  Has to be put into the wait list.
 		if (waiters_head == NULL)
 			ASSERT(waiters_tail == NULL);
-		if (txn->get_ts() > waiters_tail->txn->get_ts() && waiters_head)
+		if (waiters_head && txn->get_ts() > waiters_tail->txn->get_ts())
 			conflict = true;
 	}
 
