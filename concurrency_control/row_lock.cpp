@@ -369,14 +369,14 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
 					if (en->wound == true) {
 						ASSERT(en->txn->lock_ready == false);
+						en->wound = false;
+						en->txn->lock_ready = true;
 					} else {
 						if (en->txn->lock_ready == false) {
 							printf("%d, wound = %d\n", en->txn->get_thd_id(), en->txn->wound);
 						}
 						ASSERT(en->txn->lock_ready == true);
-						en->wound = false;
 					}
-					en->txn->lock_ready = true;
 					en = en->next;
 				}
 			}
