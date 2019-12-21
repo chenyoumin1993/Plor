@@ -7,9 +7,6 @@ struct LockEntry {
 	LockEntry * next;
 	LockEntry * prev;
 	bool wound;
-	int come_from;
-	int kill_who;
-	int kill_num;
 };
 
 class Row_lock {

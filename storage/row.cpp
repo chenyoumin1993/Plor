@@ -158,23 +158,18 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		uint64_t endtime;
 		txn->lock_abort = false;
 		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
-		if (txn->wound_other) {
-		 	// printf("me: %d, wound others, cur_owner = %d. lock = %d\n", txn->get_thd_id(), this->manager->owners->txn->get_thd_id(), txn->lock_ready);
-			// ASSERT(txn->lock_ready == false);
-		}
 		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
-			endtime = get_sys_clock();
-			if ((endtime - starttime)/1000 > 10000) {
-				printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
-				this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
-				usleep(100);
-				uint64_t cnt = 0;
-				while (true) cnt += 1;
-				// ASSERT(false);
-			}
+			// if ((endtime - starttime)/1000 > 10000) {
+			// 	printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
+			// 	this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
+			// 	usleep(100);
+			// 	uint64_t cnt = 0;
+			// 	while (true) cnt += 1;
+			// 	// ASSERT(false);
+			// }
 			continue;
 #elif CC_ALG == DL_DETECT	
 			uint64_t last_detect = starttime;

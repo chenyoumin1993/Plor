@@ -177,7 +177,6 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				int temp = woundee_cnt;
 				while (en != NULL) {
 					en->txn->wound = true;
-					txn->wound_other = true;
 					// printf("%d wound %d \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id());
 				#ifdef DEBUG_WOUND
 					txn->last_wound = en->txn->get_thd_id();
@@ -199,9 +198,6 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				entry->type = type;
 				entry->wound = true;
 				entry->next = entry->prev = NULL;
-				entry->come_from = 3;
-				entry->kill_who = woundees->txn->get_thd_id();
-				entry->kill_num = woundee_cnt - temp;
 				STACK_PUSH(owners, entry);
 				owner_cnt += 1;
 				lock_type = type;
@@ -229,10 +225,6 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
                 rc = WAIT;
 
 				en = owners;
-				while (en != NULL) {
-					ASSERT(waiters_tail->txn->get_ts() > en->txn->get_ts());
-					en = en->next;
-				}
             }
 		}
 	} else {
@@ -243,7 +235,6 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		entry->type = type;
 		entry->txn = txn;
 		entry->wound = false;
-		entry->come_from = 1;
 		STACK_PUSH(owners, entry);
 	#ifdef DEBUG_WOUND
 		owner_list[oo++] = entry->txn->get_thd_id();
@@ -444,7 +435,6 @@ RC Row_lock::lock_release(txn_man * txn) {
 		// 	}
 		// 	printf("\n");
 		// }
-		entry->come_from = 2;
 		// if (entry->txn->lock_ready != false)
 		// 	printf("me: %d, already change %d to true. (%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
 		ASSERT(entry->txn->lock_ready == false);
