@@ -33,6 +33,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 }
 
 RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
+	if (owner_cnt == 0)
+		ASSERT(lock_type == LOCK_NONE);
 	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT);
 	RC rc;
 	int part_id =_row->get_part_id();
@@ -424,7 +426,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	
 	if (owner_cnt == 0)
 		ASSERT(lock_type == LOCK_NONE);
-		
+
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
 	if (g_central_man)
