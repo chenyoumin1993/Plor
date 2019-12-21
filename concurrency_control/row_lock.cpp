@@ -227,7 +227,9 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
             }
 		}
 	} else {
-		bool ready = owners->txn->lock_ready;
+		bool ready = true;
+		if (owners)
+			owners->txn->lock_ready;
 		LockEntry * entry = get_entry();
 		entry->type = type;
 		entry->txn = txn;
