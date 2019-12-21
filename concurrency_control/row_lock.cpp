@@ -372,10 +372,10 @@ RC Row_lock::lock_release(txn_man * txn) {
 						en->wound = false;
 						en->txn->lock_ready = true;
 					} else {
-						if (en->txn->lock_ready == false) {
-							printf("%d, wound = %d\n", en->txn->get_thd_id(), en->txn->wound);
-						}
-						ASSERT(en->txn->lock_ready == true);
+						// if (en->txn->lock_ready == false) {
+						// 	printf("%d, wound = %d\n", en->txn->get_thd_id(), en->txn->wound);
+						// }
+						// ASSERT(en->txn->lock_ready == true);
 					}
 					en = en->next;
 				}
