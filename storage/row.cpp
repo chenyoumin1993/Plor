@@ -166,6 +166,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
 	#else
 		ASSERT(mylock != NULL);
+		printf("me: %d\n", txn->get_thd_id());
 		while (!mylock->ready && !txn->wound) {
 	#endif
 #if CC_ALG == WAIT_DIE 
