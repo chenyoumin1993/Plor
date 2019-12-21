@@ -386,7 +386,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
 #else 
-	while ((woundee_cnt == 0) waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
+	while ((woundee_cnt == 0) && waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
 		LIST_GET_TAIL(waiters_head, waiters_tail, entry);
 #endif
 	#ifdef DEBUG_WOUND
