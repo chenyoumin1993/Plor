@@ -72,9 +72,12 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 
 	bool conflict = conflict_lock(lock_type, type);
 
-	if (CC_ALG == WOUND_WAIT && !conflict && waiters_tail && txn->get_ts() > waiters_tail->txn->get_ts()) {
+	if (CC_ALG == WOUND_WAIT && !conflict) {
 		//  Has to be put into the wait list.
-		conflict = true;
+		if (waiters_head == NULL)
+			ASSERT(waiters_tail == NULL);
+		if (txn->get_ts() > waiters_tail->txn->get_ts() && waiters_head)
+			conflict = true;
 	}
 
 	if (CC_ALG == WAIT_DIE && !conflict) {
