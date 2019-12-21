@@ -95,6 +95,7 @@ RC thread_t::run() {
 						// while ((curr_time) < min_ready_time) {
 						// 	curr_time = get_sys_clock();
 						// }
+						
 						// endtime1 = get_sys_clock();
 						// DIS_STATS(get_thd_id(), lat_dis, (endtime1 - starttime1)/100);
 						// DIS_STATS(get_thd_id(), lat_dis, (min_ready_time - curr_time));
@@ -145,6 +146,7 @@ RC thread_t::run() {
 			m_txn->cur_owner_id = 0;
 		#endif
 			m_txn->wound = false;
+			m_txn->wound_other = false;
 		}
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
@@ -205,6 +207,9 @@ RC thread_t::run() {
 #endif
 		}
 		if (rc == Abort) {
+			abt_cnt += 1;
+			if (abt_cnt % 10000 == 0)
+				printf("%d, abort for %lld times\n", (int)get_thd_id(), abt_cnt);
 			m_query->abort_cnt += 1;
 			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;

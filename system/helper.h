@@ -59,7 +59,6 @@
      if (lhead) lhead->prev = NULL; \
      else ltail = NULL; \
      en->next = NULL; }
-
 #define LIST_GET_TAIL(lhead, ltail, en) {\
 	en = ltail; \
 	ltail = ltail->prev; \

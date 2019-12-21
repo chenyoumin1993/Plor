@@ -79,6 +79,7 @@ public:
 	
 	// For WOUND_WAIT
 	bool wound = false;
+	bool wound_other = false;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
 	int wound_cnt_discovered = 0;

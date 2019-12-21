@@ -33,6 +33,7 @@ private:
 	RC	 		runTest(txn_man * txn);
 	drand48_data buffer;
 
+	uint64_t abt_cnt = 0;
 	// A restart buffer for aborted txns.
 	struct AbortBufferEntry	{
 		ts_t ready_time;

@@ -6,6 +6,10 @@ struct LockEntry {
     txn_man * txn;
 	LockEntry * next;
 	LockEntry * prev;
+	bool task;
+	int come_from;
+	int kill_who;
+	int kill_num;
 };
 
 class Row_lock {
@@ -40,10 +44,13 @@ public:
 	LockEntry * waiters_head;
 	LockEntry * waiters_tail;
 
+	LockEntry * woundees;
+	UInt32 woundee_cnt;
 
-	bool wounding = false;
-	LockEntry *wounders;
-	lock_t wound_type;
+
+	// bool wounding = false;
+	// LockEntry *wounders;
+	// lock_t wound_type;
 #ifdef DEBUG_WOUND
 	int owner_list[10000];
 	int owner_ts_list[10000];

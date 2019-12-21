@@ -157,6 +157,10 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		uint64_t endtime;
 		txn->lock_abort = false;
 		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
+		if (txn->wound_other) {
+		 	// printf("me: %d, wound others, cur_owner = %d. lock = %d\n", txn->get_thd_id(), this->manager->owners->txn->get_thd_id(), txn->lock_ready);
+			// ASSERT(txn->lock_ready == false);
+		}
 		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) 
 		{
 #if CC_ALG == WAIT_DIE 
@@ -199,13 +203,13 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 				PAUSE
 #endif
 		}
-		if (txn->lock_ready) 
+		if (txn->lock_ready) {
 			rc = RCOK;
+		}
 		else if (txn->lock_abort) { 
 			rc = Abort;
 			return_row(type, txn, NULL);
-		}
-		if (txn->wound) {
+		} else if (txn->wound) {
 		#ifdef DEBUG_WOUND
 			txn->wound_cnt_discovered +=1;
 			// printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);

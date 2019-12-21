@@ -130,7 +130,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 		// lock_cnt += 1;
 		// wound_cnt_discovered1 += 1;
 		// printf("%d wounded-1, cnt = %d\n", get_thd_id(), wound_cnt);
-		return NULL;
+		// return NULL;
 	}
 	if (CC_ALG == HSTORE)
 		return row;

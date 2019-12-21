@@ -9,8 +9,10 @@ void Row_lock::init(row_t * row) {
 	owners = NULL;
 	waiters_head = NULL;
 	waiters_tail = NULL;
+	woundees = NULL;
 	owner_cnt = 0;
 	waiter_cnt = 0;
+	woundee_cnt = 0;
 #ifdef USE_SPINLOCK
 	latch = new pthread_spinlock_t;
 	pthread_spin_init(latch, 0);
@@ -30,7 +32,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 	return lock_get(type, txn, txnids, txncnt);
 }
 
-RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
+RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt, LockEntry* &mylock) {
 	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT);
 	RC rc;
 	int part_id =_row->get_part_id();
@@ -66,20 +68,13 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	assert(cnt == waiter_cnt);
 #endif
 
-	bool conflict;
-#if CC_ALG == WOUND_WAIT
-	if (!wounding) {
-		conflict = conflict_lock(lock_type, type);
-		if (waiters_head && txn->get_ts() > waiters_tail->txn->get_ts())
-			conflict = true;
-	} else {
-		// Someone already wound the lock, just ignore the original lock.
-		conflict = conflict_lock(wound_type, type);
-		if (waiters_head && txn->get_ts() > waiters_tail->txn->get_ts())
-			conflict = true;
+	bool conflict = conflict_lock(lock_type, type);
+
+	if (CC_ALG == WOUND_WAIT && !conflict && waiters_head && txn->get_ts() > waiters_tail->txn->get_ts()) {
+		//  Has to be put into the wait list.
+		conflict = true;
 	}
-#else
-	conflict = conflict_lock(lock_type, type);
+
 	if (CC_ALG == WAIT_DIE && !conflict) {
 		// only allow it to be inserted 
 		// in the wait queue if it is newer than some of them in the wait queue.
@@ -87,7 +82,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		if (waiters_head && txn->get_ts() < waiters_head->txn->get_ts())
 			conflict = true;
 	}
-#endif
+
 	// Some txns coming earlier is waiting. Should also wait.
 	if (CC_ALG == DL_DETECT && waiters_head != NULL)
 		conflict = true;
@@ -105,7 +100,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			waiter_cnt ++;
             txn->lock_ready = false;
             rc = WAIT;
-		} else if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) {
+		} else if (CC_ALG == WAIT_DIE) {
             ///////////////////////////////////////////////////////////
             //  - T is the txn currently running
 			//	IF T.ts < ts of all owners
@@ -155,7 +150,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
             //////////////////////////////////////////////////////////
 
 			bool wound = true;
-			LockEntry * en = wounding ? wounders : owners;
+			LockEntry * en = owners, * prev = NULL;
 			while (en != NULL) {
                 if (en->txn->get_ts() < txn->get_ts()) {
 					wound = false;
@@ -164,22 +159,45 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				en = en->next;
 			}
 		#ifdef DEBUG_WOUND
-			txn->cur_owner_id = wounding ? wounders->txn->get_thd_id() : owners->txn->get_thd_id();		
+			txn->cur_owner_id = owners->txn->get_thd_id();		
 		#endif	
 			if (wound) {
 				// T is older than all the owners, wound them.
-				asm volatile ("mfence" ::: "memory");
-				en = wounding ? wounders : owners;
+				en = owners;
+				ASSERT(owners != NULL);
+				int temp = woundee_cnt;
 				while (en != NULL) {
 					en->txn->wound = true;
+					txn->wound_other = true;
+					// printf("%d wound %d \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id());
 				#ifdef DEBUG_WOUND
 					txn->last_wound = en->txn->get_thd_id();
 					// printf("%d wound %d cnt = %d. \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id(), en->txn->wound_cnt);
 				#endif
+					prev = en;
 					en = en->next;
+					prev->next = prev->prev = NULL;
+					STACK_PUSH(woundees, prev);
+					woundee_cnt ++;
+					// delete them from the owner list directly.
+					owner_cnt --;
 				}
-				asm volatile ("mfence" ::: "memory");
-				// then put myself in the wound_list
+				owners = NULL;
+				// then put myself in the owners but with unready status.
+				ASSERT(owner_cnt == 0);
+				LockEntry * entry = get_entry();
+				entry->txn = txn;
+				entry->type = type;
+				entry->next = entry->prev = NULL;
+				entry->come_from = 3;
+				entry->kill_who = woundees->txn->get_thd_id();
+				entry->kill_num = woundee_cnt - temp;
+				STACK_PUSH(owners, entry);
+				owner_cnt += 1;
+				lock_type = type;
+				// Althrough we wound the owner, we cannot acquire the lock immediately.
+				rc = WAIT;
+				txn->lock_ready = false;
 			} else { // wait
 				// insert txn to the right position 
 				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
@@ -199,13 +217,12 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
                 txn->lock_ready = false;
                 rc = WAIT;
             }
-            else 
-                rc = Abort;
 		}
 	} else {
 		LockEntry * entry = get_entry();
 		entry->type = type;
 		entry->txn = txn;
+		entry->come_from = 1;
 		STACK_PUSH(owners, entry);
 	#ifdef DEBUG_WOUND
 		owner_list[oo++] = entry->txn->get_thd_id();
@@ -215,7 +232,14 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
 			ASSERT(waiters_head == NULL);
-        rc = RCOK;
+		if (CC_ALG == WOUND_WAIT && woundee_cnt > 0) {
+			// The owners is the wounder, and is not running.
+			// ASSERT(en->txn->lock_ready == false);
+			rc = WAIT;
+			txn->lock_ready = false;
+		} else {
+			rc = RCOK;
+		}
 	}
 final:
 	
@@ -253,7 +277,7 @@ final:
 
 
 RC Row_lock::lock_release(txn_man * txn) {	
-
+	int road = 0;
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
@@ -272,12 +296,14 @@ RC Row_lock::lock_release(txn_man * txn) {
 		en = en->next;
 	}
 	if (en) { // find the entry in the owner list
+		// ASSERT(woundee_cnt == 0);
 		if (prev) prev->next = en->next;
 		else owners = en->next;
 	#ifdef DEBUG_WOUND
 		release_list[rr++] = en->txn->get_thd_id();
 	#endif
 		return_entry(en);
+		road = 1;
 		owner_cnt --;
 		if (owner_cnt == 0)
 			lock_type = LOCK_NONE;
@@ -286,19 +312,60 @@ RC Row_lock::lock_release(txn_man * txn) {
 		en = waiters_head;
 		while (en != NULL && en->txn != txn)
 			en = en->next;
-		ASSERT(en);
-	#ifdef DEBUG_WOUND
-		release_list[rr++] = en->txn->get_thd_id();
-	#endif
-		LIST_REMOVE(en);
-		if (en == waiters_head)
-			waiters_head = en->next;
-		if (en == waiters_tail)
-			waiters_tail = en->prev;
-		return_entry(en);
-		waiter_cnt --;
+		if (CC_ALG != WOUND_WAIT)
+			ASSERT(en != NULL);
+		if (en == NULL) {
+			// I was wounded by others.
+			ASSERT(CC_ALG == WOUND_WAIT);
+			// find me in the woundees.
+			en = woundees;
+			prev = NULL;
+			while (en != NULL && en->txn != txn) {
+				prev = en;
+				en = en->next;
+			}
+			ASSERT(en != NULL);
+			if (prev) prev->next = en->next;
+			else woundees = en->next;
+			woundee_cnt --;
+			if (woundee_cnt == 0)
+				woundees = NULL;
+			road = 2;
+			ASSERT(woundee_cnt >= 0);
+			return_entry(en);
+			asm volatile ("mfence" ::: "memory");
+			if (woundee_cnt == 0) {
+				// make owners alive.
+				// if (owner_cnt != 0 || owners->txn->lock_ready == true)
+				// 	printf("me: %d, owner_cnt = %d, cur_owner = %d, lock = %d\n", txn->get_thd_id(), owner_cnt, owners->txn->get_thd_id(), owners->txn->lock_ready == true);
+				// ASSERT(owner_cnt != 0);
+				en = owners;
+				while (en != NULL) {
+					// printf("me: %d, owner = %d wound = %d, lock_addr = %p, lock = %d\n", txn->get_thd_id(), en->txn->get_thd_id(), txn->wound, &(en->txn->lock_ready), en->txn->lock_ready);
+					// sleep(1);
+					// if (en->txn->lock_ready != false)
+					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
+					if (en->txn->lock_ready == false)
+						en->txn->lock_ready = true;
+					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
+					// ASSERT(en->txn->lock_ready == false);
+					en = en->next;
+				}
+			}
+		} else {
+		#ifdef DEBUG_WOUND
+			release_list[rr++] = en->txn->get_thd_id();
+		#endif
+			LIST_REMOVE(en);
+			if (en == waiters_head)
+				waiters_head = en->next;
+			if (en == waiters_tail)
+				waiters_tail = en->prev;
+			return_entry(en);
+			waiter_cnt --;
+			road = 3;
+		}
 	}
-
 	if (owner_cnt == 0)
 		ASSERT(lock_type == LOCK_NONE);
 #if DEBUG_ASSERT && CC_ALG == WAIT_DIE 
@@ -308,6 +375,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 
 	LockEntry * entry;
 	// If any waiter can join the owners, just do it!
+	bool add_new_one = false;
 #if CC_ALG != WOUND_WAIT
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
@@ -320,12 +388,40 @@ RC Row_lock::lock_release(txn_man * txn) {
 		owner_ts_list[tt++] = entry->txn->get_ts();
 	#endif
 		STACK_PUSH(owners, entry);
+		add_new_one = true;
+		// printf("me = %d, change waiter (%d) to true, road = %d, woundee_cnt = %d, owner_cnt = %d, waiter_cnt = %d.\n", txn->get_thd_id(), entry->txn->get_thd_id(), road, woundee_cnt, owner_cnt, waiter_cnt);
 		owner_cnt ++;
 		waiter_cnt --;
+
+		// ASSERT(woundee_cnt == 0);
+		// if (entry->txn->lock_ready != false) {
+		// 	printf("me: %d, %d is already ready.(%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
+		// 	printf("own_cnt = %d:\t", owner_cnt);
+		// 	en = owners;
+		// 	while (en != NULL) {
+		// 		printf("%d\t", en->txn->get_thd_id());
+		// 		en = en->next;
+		// 	}
+		// 	printf("\n");
+		// }
+		entry->come_from = 2;
+		if (entry->txn->lock_ready != false)
+			printf("me: %d, already change %d to true. (%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
 		ASSERT(entry->txn->lock_ready == false);
 		entry->txn->lock_ready = true;
+		printf("me: %d, change %d to true. (%p)\n", txn->get_thd_id(), entry->txn->get_thd_id(), this);
 		lock_type = entry->type;
 	} 
+
+	if (add_new_one && woundee_cnt != 0 && road == 1) {
+		// I am still waiting in the owner list, but was wounded by others.
+		// Tell the woundees that they don't need to activate others.
+		LockEntry *entry = woundees;
+		while (entry != NULL) {
+			entry->task = false;
+			entry = entry->next;
+		}
+	}
 	
 	ASSERT((owners == NULL) == (owner_cnt == 0));
 
