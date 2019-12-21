@@ -356,8 +356,8 @@ RC Row_lock::lock_release(txn_man * txn) {
 					// 	printf("me = %d, fail to change owner (%d) to true.\n", txn->get_thd_id(), en->txn->get_thd_id());
 					if (en->wound == true) {
 						ASSERT(en->txn->lock_ready == false);
-						en->txn->lock_ready = true;
 						en->wound = false;
+						en->txn->lock_ready = true;
 					}
 					// 	printf("me = %d, change owner (%d) to true (%p).\n", txn->get_thd_id(), en->txn->get_thd_id(), this);
 					// ASSERT(en->txn->lock_ready == false);
@@ -392,7 +392,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	while (waiters_head && !conflict_lock(lock_type, waiters_head->type)) {
 		LIST_GET_HEAD(waiters_head, waiters_tail, entry);
 #else 
-	while ((woundee_cnt == 0) && waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
+	while ((road != 2) && waiters_tail && !conflict_lock(lock_type, waiters_tail->type)) {
 		LIST_GET_TAIL(waiters_head, waiters_tail, entry);
 #endif
 	#ifdef DEBUG_WOUND
