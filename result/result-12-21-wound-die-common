@@ -1,0 +1,105 @@
+Rd	Wt	Zip	T	CC	TP	P50	P90	P99	P999	Abt
+0.50	0.50	0.50	4	WOUND_WAIT	0	676078.00	5	6	6	7	9	|	0	0	0	0	0	|	0
+0.50	0.50	0.50	8	WOUND_WAIT	0	1460364.09	5	6	6	6	10	|	0	0	0	0	0	|	0
+0.50	0.50	0.50	12	WOUND_WAIT	0	1930191.90	6	6	7	7	12	|	0	0	0	0	0	|	0
+0.50	0.50	0.50	16	WOUND_WAIT	0	2534168.15	6	7	7	7	11	|	0	0	0	0	0	|	0
+0.50	0.50	0.50	20	WOUND_WAIT	0	2944675.88	6	7	8	8	13	|	0	0	0	0	0	|	2
+0.50	0.50	0.50	24	WOUND_WAIT	0	3241238.46	7	8	8	9	12	|	0	0	0	0	0	|	3
+0.50	0.50	0.50	28	WOUND_WAIT	0	3501365.39	7	9	9	10	15	|	0	0	0	0	0	|	3
+0.50	0.50	0.50	32	WOUND_WAIT	0	3758933.05	8	9	10	11	15	|	0	0	0	0	0	|	3
+0.50	0.50	0.50	36	WOUND_WAIT	0	4162216.90	8	9	10	11	15	|	0	0	0	0	0	|	9
+0.90	0.10	0.50	4	WOUND_WAIT	0	789822.44	5	5	5	5	9	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	8	WOUND_WAIT	0	1373706.72	5	6	6	7	10	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	12	WOUND_WAIT	0	2082565.83	5	6	6	7	10	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	16	WOUND_WAIT	0	2686141.29	5	6	6	7	11	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	20	WOUND_WAIT	0	3106800.59	6	7	7	8	12	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	24	WOUND_WAIT	0	3505464.91	6	7	8	8	12	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	28	WOUND_WAIT	0	3897119.28	7	8	8	9	13	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	32	WOUND_WAIT	0	4167762.09	7	8	9	9	14	|	0	0	0	0	0	|	0
+0.90	0.10	0.50	36	WOUND_WAIT	0	4495466.78	7	9	9	10	14	|	0	0	0	0	0	|	1
+0.50	0.50	0.90	4	WOUND_WAIT	0	949738.70	4	5	5	8	67	|	0	0	0	0	1	|	992
+0.50	0.50	0.90	8	WOUND_WAIT	0	1589265.82	4	7	9	25	103	|	0	0	0	1	1	|	9371
+0.50	0.50	0.90	12	WOUND_WAIT	0	2044633.11	4	11	15	75	113	|	0	0	0	1	1	|	29385
+0.50	0.50	0.90	16	WOUND_WAIT	0	2012110.39	5	19	26	96	131	|	0	0	0	1	2	|	63038
+0.50	0.50	0.90	20	WOUND_WAIT	0	1503338.48	6	38	53	123	181	|	0	0	1	1	2	|	111508
+0.50	0.50	0.90	24	WOUND_WAIT	0	1293469.13	6	57	82	151	229	|	0	0	1	1	2	|	174518
+0.50	0.50	0.90	28	WOUND_WAIT	0	1198249.12	7	76	108	179	271	|	0	0	1	1	2	|	252184
+0.50	0.50	0.90	32	WOUND_WAIT	0	7, abort for 10000 times
+8, abort for 10000 times
+12, abort for 10000 times
+6, abort for 10000 times
+0, abort for 10000 times
+10, abort for 10000 times
+2, abort for 10000 times
+16, abort for 10000 times
+1, abort for 10000 times
+9, abort for 10000 times
+15, abort for 10000 times
+27, abort for 10000 times
+4, abort for 10000 times
+20, abort for 10000 times
+11, abort for 10000 times
+22, abort for 10000 times
+5, abort for 10000 times
+17, abort for 10000 times
+25, abort for 10000 times
+28, abort for 10000 times
+23, abort for 10000 times
+3, abort for 10000 times
+26, abort for 10000 times
+13, abort for 10000 times
+21, abort for 10000 times
+29, abort for 10000 times
+31, abort for 10000 times
+19, abort for 10000 times
+14, abort for 10000 times
+30, abort for 10000 times
+24, abort for 10000 times
+18, abort for 10000 times
+1121616.45	8	97	131	209	310	|	0	0	1	2	3	|	338648
+0.50	0.50	0.90	36	WOUND_WAIT	0	28, abort for 10000 times
+1, abort for 10000 times
+31, abort for 10000 times
+27, abort for 10000 times
+9, abort for 10000 times
+21, abort for 10000 times
+25, abort for 10000 times
+29, abort for 10000 times
+19, abort for 10000 times
+4, abort for 10000 times
+6, abort for 10000 times
+26, abort for 10000 times
+2, abort for 10000 times
+17, abort for 10000 times
+8, abort for 10000 times
+16, abort for 10000 times
+18, abort for 10000 times
+15, abort for 10000 times
+23, abort for 10000 times
+24, abort for 10000 times
+11, abort for 10000 times
+0, abort for 10000 times
+12, abort for 10000 times
+7, abort for 10000 times
+5, abort for 10000 times
+22, abort for 10000 times
+13, abort for 10000 times
+30, abort for 10000 times
+10, abort for 10000 times
+33, abort for 10000 times
+32, abort for 10000 times
+20, abort for 10000 times
+34, abort for 10000 times
+14, abort for 10000 times
+35, abort for 10000 times
+3, abort for 10000 times
+989492.73	11	127	165	258	379	|	0	1	1	2	3	|	440529
+0.90	0.10	0.90	4	WOUND_WAIT	0	1065554.51	3	4	4	5	8	|	0	0	0	0	0	|	87
+0.90	0.10	0.90	8	WOUND_WAIT	0	1864376.04	4	5	5	8	26	|	0	0	0	0	1	|	981
+0.90	0.10	0.90	12	WOUND_WAIT	0	2783572.24	3	5	7	10	77	|	0	0	0	0	1	|	3275
+0.90	0.10	0.90	16	WOUND_WAIT	0	3176596.25	4	7	9	15	95	|	0	0	0	0	1	|	7821
+0.90	0.10	0.90	20	WOUND_WAIT	0	2543296.30	5	16	23	40	121	|	0	0	0	0	1	|	17983
+0.90	0.10	0.90	24	WOUND_WAIT	0	2117001.14	5	29	38	72	155	|	0	0	0	1	1	|	32791
+0.90	0.10	0.90	28	WOUND_WAIT	0	1899961.22	6	41	52	103	194	|	0	0	0	1	2	|	50286
+0.90	0.10	0.90	32	WOUND_WAIT	0	1792502.89	6	52	65	126	230	|	0	0	0	1	2	|	71140
+0.90	0.10	0.90	36	WOUND_WAIT	0	1549144.01	6	70	87	156	288	|	0	0	0	1	2	|	94387
