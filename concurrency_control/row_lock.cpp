@@ -227,6 +227,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
             }
 		}
 	} else {
+		bool ready = owners->txn->lock_ready;
 		LockEntry * entry = get_entry();
 		entry->type = type;
 		entry->txn = txn;
@@ -241,12 +242,13 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		lock_type = type;
 		if (CC_ALG == DL_DETECT) 
 			ASSERT(waiters_head == NULL);
-		if (CC_ALG == WOUND_WAIT && woundee_cnt > 0) {
+		if (CC_ALG == WOUND_WAIT && !ready) {
 			// The owners is the wounder, and is not running.
 			// ASSERT(en->txn->lock_ready == false);
 			rc = WAIT;
 			txn->lock_ready = false;
 		} else {
+			txn->lock_ready = true;
 			rc = RCOK;
 		}
 	}
