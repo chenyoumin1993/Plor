@@ -146,6 +146,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 #endif
 
 	if (rc == RCOK) {
+		ASSERT(txn->lock_ready == true);
 		row = this;
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
