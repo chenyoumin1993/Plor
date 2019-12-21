@@ -37,7 +37,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	if (owner_cnt == 0) {
 		ASSERT(owners == NULL);
 		if (lock_type != LOCK_NONE)
-			printf("me: %d, counter = %d, lock_type = %d\n", txn->get_thd_id(), counter, lock_type);
+			printf("me: %d, counter = %d, lock_type = %d, owner_cnt = %d, waiter_cnt = %d, woundee_cnt = %d\n", 
+			txn->get_thd_id(), counter, lock_type, owner_cnt, waiter_cnt, woundee_cnt);
 		ASSERT(lock_type == LOCK_NONE);
 	}
 	counter += 1;
