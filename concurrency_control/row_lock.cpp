@@ -227,6 +227,12 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				waiter_cnt ++;
                 txn->lock_ready = false;
                 rc = WAIT;
+
+				en = owners;
+				while (en != NULL) {
+					ASSERT(waiters_tail->txn->get_ts() > en->txn->get_ts());
+					en = en->next;
+				}
             }
 		}
 	} else {
