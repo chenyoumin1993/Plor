@@ -170,7 +170,9 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 			if ((endtime - starttime)/1000 > 10000) {
 				printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
 				this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
-				while (true);
+				usleep(100);
+				uint64_t cnt = 0;
+				while (true) cnt += 1;
 				// ASSERT(false);
 			}
 			continue;
