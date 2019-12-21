@@ -157,7 +157,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 			bool wound = false;
 			LockEntry * en = owners, * prev = NULL;
 			while (en != NULL) {
-                if (en->txn->get_ts() < txn->get_ts()) {
+                if (en->txn->get_ts() > txn->get_ts()) {
 					wound = true;
 					break;
 				}
