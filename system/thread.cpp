@@ -206,9 +206,6 @@ RC thread_t::run() {
 #endif
 		}
 		if (rc == Abort) {
-			abt_cnt += 1;
-			if (abt_cnt % 10000 == 0)
-				printf("%d, abort for %lld times\n", (int)get_thd_id(), abt_cnt);
 			m_query->abort_cnt += 1;
 			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;

@@ -3,15 +3,15 @@
 #define THREAD_CNT 36
 #define CC_ALG WOUND_WAIT
 #define ZIPF_THETA 0.9
-#define READ_PERC 0.9
-#define WRITE_PERC 0.1
+#define READ_PERC 0.5
+#define WRITE_PERC 0.5
 
 // #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000
 
 #define LONG_TX_ENABLE 1
 #define LONG_TX_PERC 0.00125
-#define LONG_TX_EXEC_TIME 0
+#define LONG_TX_EXEC_TIME 1000
 
 // #define DEBUG_WOUND 1
 
