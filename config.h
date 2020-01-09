@@ -11,7 +11,7 @@
 
 #define LONG_TX_ENABLE 1
 #define LONG_TX_PERC 0.00125
-#define LONG_TX_EXEC_TIME 1000
+#define LONG_TX_EXEC_TIME 0
 
 // #define DEBUG_WOUND 1
 
@@ -226,5 +226,5 @@ extern TestCases					g_test_case;
 #define TS_CAS						2
 #define TS_HW						3
 #define TS_CLOCK					4
-
+#include <gperftools/profiler.h>
 #endif
