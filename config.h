@@ -1,10 +1,10 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define THREAD_CNT 36
-#define CC_ALG WOUND_WAIT
-#define ZIPF_THETA 0.9
-#define READ_PERC 0.5
-#define WRITE_PERC 0.5
+#define CC_ALG SILO
+#define ZIPF_THETA 0.5
+#define READ_PERC 0
+#define WRITE_PERC 1
 
 // #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000

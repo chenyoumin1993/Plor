@@ -158,5 +158,3 @@ RC ycsb_wl::get_txn_man(txn_man *& txn_manager, thread_t * h_thd){
 	txn_manager->init(h_thd, this, h_thd->get_thd_id());
 	return RCOK;
 }
-
-
