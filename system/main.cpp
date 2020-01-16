@@ -101,7 +101,7 @@ int main(int argc, char* argv[])
 
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
-	ProfilerStart("./prof");
+	// ProfilerStart("./prof");
 #ifdef USE_EPOCH
 	finished = false;
 	pthread_create(&e, NULL, epoch, (void *)0);
@@ -118,7 +118,7 @@ int main(int argc, char* argv[])
 	finished = true;
 	pthread_join(e, NULL);
 #endif
-	ProfilerStop();
+	// ProfilerStop();
 	if (WORKLOAD != TEST) {
 		// printf("PASS! SimTime = %ld\n", endtime - starttime);
 		if (STATS_ENABLE)
