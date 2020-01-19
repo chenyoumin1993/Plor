@@ -1,3 +1,5 @@
+#include <thread>
+
 #include "global.h"
 #include "ycsb.h"
 #include "tpcc.h"
@@ -9,8 +11,13 @@
 #include "plock.h"
 #include "occ.h"
 #include "vll.h"
+#include "coro.h"
 
 void * f(void *);
+void exec(coro_yield_t &yield, int coro_id);
+
+__thread coro_call_t *coro_arr;
+__thread int *next_coro;
 
 #ifdef USE_EPOCH
 void * epoch(void *);
@@ -19,6 +26,10 @@ pthread_t e;
 #endif
 
 thread_t ** m_thds;
+
+workload * m_wl;
+thread perf;
+bool start_perf = false;
 
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -34,7 +45,6 @@ int main(int argc, char* argv[])
 	if (g_cc_alg == DL_DETECT) 
 		dl_detector.init();
 	// printf("mem_allocator initialized!\n");
-	workload * m_wl;
 	switch (WORKLOAD) {
 		case YCSB :
 			m_wl = new ycsb_wl; break;
@@ -51,7 +61,7 @@ int main(int argc, char* argv[])
 	// printf("workload initialized!\n");
 	
 	uint64_t thd_cnt = g_thread_cnt;
-	pthread_t p_thds[thd_cnt - 1];
+	pthread_t p_thds[CORE_CNT - 1];
 	m_thds = new thread_t * [thd_cnt];
 	for (uint32_t i = 0; i < thd_cnt; i++)
 		m_thds[i] = (thread_t *) _mm_malloc(sizeof(thread_t), 64);
@@ -79,12 +89,12 @@ int main(int argc, char* argv[])
 #ifdef USE_EPOCH
 		pthread_create(&e, NULL, epoch, (void *)0);
 #endif
-		for (uint32_t i = 0; i < thd_cnt - 1; i++) {
+		for (uint32_t i = 0; i < CORE_CNT - 1; i++) {
 			uint64_t vid = i;
 			pthread_create(&p_thds[i], NULL, f, (void *)vid);
 		}
-		f((void *)(thd_cnt - 1)); // Er... the main thread also do warmup.
-		for (uint32_t i = 0; i < thd_cnt - 1; i++)
+		f((void *)(CORE_CNT - 1)); // Er... the main thread also do warmup.
+		for (uint32_t i = 0; i < CORE_CNT - 1; i++)
 			pthread_join(p_thds[i], NULL);
 		// printf("WARMUP finished!\n");
 	}
@@ -93,32 +103,33 @@ int main(int argc, char* argv[])
 	pthread_join(e, NULL);
 #endif
 	warmup_finish = true;
-	pthread_barrier_init( &warmup_bar, NULL, g_thread_cnt );
+	pthread_barrier_init( &warmup_bar, NULL, CORE_CNT );
 #ifndef NOGRAPHITE
-	CarbonBarrierInit(&enable_barrier, g_thread_cnt);
+	CarbonBarrierInit(&enable_barrier, CORE_CNT);
 #endif
-	pthread_barrier_init( &warmup_bar, NULL, g_thread_cnt );
+	pthread_barrier_init( &warmup_bar, NULL, CORE_CNT );
 
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
-	// ProfilerStart("./prof");
+	
 #ifdef USE_EPOCH
 	finished = false;
 	pthread_create(&e, NULL, epoch, (void *)0);
 #endif
-	for (uint32_t i = 0; i < thd_cnt - 1; i++) {
+	start_perf = true;
+	for (uint32_t i = 0; i < CORE_CNT - 1; i++) {
 		uint64_t vid = i;
 		pthread_create(&p_thds[i], NULL, f, (void *)vid);
 	}
-	f((void *)(thd_cnt - 1));
-	for (uint32_t i = 0; i < thd_cnt - 1; i++) 
+	f((void *)(CORE_CNT - 1));
+	for (uint32_t i = 0; i < CORE_CNT - 1; i++) 
 		pthread_join(p_thds[i], NULL);
 	// int64_t endtime = get_server_clock();
 #ifdef USE_EPOCH
 	finished = true;
 	pthread_join(e, NULL);
 #endif
-	// ProfilerStop();
+	perf.join();
 	if (WORKLOAD != TEST) {
 		// printf("PASS! SimTime = %ld\n", endtime - starttime);
 		if (STATS_ENABLE)
@@ -131,8 +142,22 @@ int main(int argc, char* argv[])
 
 void * f(void * id) {
 	uint64_t tid = (uint64_t)id;
-	m_thds[tid]->run();
+	coro_arr = new coro_call_t[CORO_CNT];
+	next_coro = new int[CORO_CNT];
+
+	for (int i = 0; i < CORO_CNT - 1; i++) {
+		next_coro[i] = i + 1;
+		coro_arr[i] = coro_call_t(bind(exec, _1, i * CORE_CNT + tid), attributes(fpu_not_preserved));
+		// coro_arr[i] = coro_call_t(bind(exec, _1, tid), attributes(fpu_not_preserved));
+	}
+	next_coro[CORO_CNT - 1] = 0;
+	coro_arr[CORO_CNT - 1] = coro_call_t(bind(exec, _1, (CORO_CNT - 1) * CORE_CNT + tid), attributes(fpu_not_preserved));
+	coro_arr[0]();
 	return NULL;
+}
+
+void exec(coro_yield_t &yield, int coro_id) {
+	m_thds[coro_id]->run(yield, coro_id);
 }
 
 #ifdef USE_EPOCH

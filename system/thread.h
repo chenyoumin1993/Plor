@@ -2,6 +2,7 @@
 
 #include "global.h"
 #include <queue>
+#include "coro.h"
 
 class workload;
 class base_query;
@@ -23,7 +24,7 @@ public:
 	// the following function must be in the form void* (*)(void*)
 	// to run with pthread.
 	// conversion is done within the function.
-	RC 			run();
+	RC 			run(coro_yield_t &yield, int coro_id);
 private:
 	uint64_t 	_host_cid;
 	uint64_t 	_cur_cid;

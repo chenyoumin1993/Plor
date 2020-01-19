@@ -25,12 +25,12 @@ Query_queue::init(workload * h_wl) {
 	assert(tpcc_buffer != NULL);
 #endif
 	// int64_t begin = get_server_clock();
-	pthread_t p_thds[g_thread_cnt - 1];
-	for (UInt32 i = 0; i < g_thread_cnt - 1; i++) {
+	pthread_t p_thds[CORE_CNT - 1];
+	for (UInt32 i = 0; i < CORE_CNT - 1; i++) {
 		pthread_create(&p_thds[i], NULL, threadInitQuery, this);
 	}
 	threadInitQuery(this);
-	for (uint32_t i = 0; i < g_thread_cnt - 1; i++) 
+	for (uint32_t i = 0; i < CORE_CNT - 1; i++) 
 		pthread_join(p_thds[i], NULL);
 	// int64_t end = get_server_clock();
 	// printf("Query Queue Init Time %f\n", 1.0 * (end - begin) / 1000000000UL);
@@ -52,12 +52,18 @@ Query_queue::get_next_query(uint64_t thd_id) {
 void *
 Query_queue::threadInitQuery(void * This) {
 	Query_queue * query_queue = (Query_queue *)This;
-	uint32_t tid = ATOM_FETCH_ADD(_next_tid, 1);
 	
-	// set cpu affinity
-	set_affinity(tid);
+	while (true) {
+		uint32_t tid = ATOM_FETCH_ADD(_next_tid, 1);
+		
+		if (tid > (g_thread_cnt - 1))
+			break;
+		
+		// set cpu affinity
+		// set_affinity(tid);
 
-	query_queue->init_per_thread(tid);
+		query_queue->init_per_thread(tid);
+	}
 	return NULL;
 }
 
@@ -73,6 +79,7 @@ Query_thd::init(workload * h_wl, int thread_id) {
 #if ABORT_BUFFER_ENABLE
     request_cnt += ABORT_BUFFER_SIZE;
 #endif
+	_request_cnt = request_cnt;
 #if WORKLOAD == YCSB	
 	queries = (ycsb_query *) 
 		mem_allocator.alloc(sizeof(ycsb_query) * request_cnt, thread_id);
@@ -95,5 +102,7 @@ base_query *
 Query_thd::get_next_query() {
 	base_query * query = &queries[q_idx++];
 	query->start_time = get_sys_clock();
+	if (q_idx >= _request_cnt) q_idx = 0;
+	if (query == NULL) printf("no requests......\n");
 	return query;
 }

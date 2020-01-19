@@ -2,6 +2,7 @@
 
 #include "global.h"
 #include "helper.h"
+#include "coro.h"
 
 class workload;
 class thread_t;
@@ -45,7 +46,7 @@ public:
 	myrand * mrand;
 	uint64_t abort_cnt;
 
-	virtual RC 		run_txn(base_query * m_query) = 0;
+	virtual RC 		run_txn(base_query * m_query, coro_yield_t &yield, int coro_id) = 0;
 	uint64_t 		get_thd_id();
 	workload * 		get_wl();
 	void 			set_txn_id(txnid_t txn_id);
@@ -101,6 +102,7 @@ public:
 	TxnType 		vll_txn_type;
 	itemid_t *		index_read(INDEX * index, idx_key_t key, int part_id);
 	void 			index_read(INDEX * index, idx_key_t key, int part_id, itemid_t *& item);
+	row_t * 		get_row(row_t * row, access_t type, coro_yield_t &yield, int coro_id);
 	row_t * 		get_row(row_t * row, access_t type);
 protected:	
 	void 			insert_row(row_t * row, table_t * table);

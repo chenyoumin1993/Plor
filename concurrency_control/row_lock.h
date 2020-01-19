@@ -18,7 +18,7 @@ public:
     RC lock_release(txn_man * txn);
 	
 // private:
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 	pthread_spinlock_t * latch;
 #else
     pthread_mutex_t * latch;

@@ -27,7 +27,7 @@ void ycsb_txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	_wl = (ycsb_wl *) h_wl;
 }
 
-RC ycsb_txn_man::run_txn(base_query * query) {
+RC ycsb_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
 	RC rc;
 	ycsb_query * m_query = (ycsb_query *) query;
 	ycsb_wl * wl = (ycsb_wl *) h_wl;
@@ -56,7 +56,7 @@ RC ycsb_txn_man::run_txn(base_query * query) {
 			access_t type = req->rtype;
 			
 			// Make a local copy and lock the item if necessary.
-			row_local = get_row(row, type);
+			row_local = get_row(row, type, yield, coro_id);
 			if (row_local == NULL) {
 				rc = Abort;
 				goto final;

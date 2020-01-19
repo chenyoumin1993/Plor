@@ -118,8 +118,12 @@ Row_silo::try_lock()
 uint64_t 
 Row_silo::get_tid()
 {
-	assert(ATOMIC_WORD);
+#if ATOMIC_WORD
+	ASSERT(ATOMIC_WORD);
 	return _tid_word & (~LOCK_BIT);
+#else
+	return _tid;
+#endif
 }
 
 #endif

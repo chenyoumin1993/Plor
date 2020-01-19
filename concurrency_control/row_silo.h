@@ -20,13 +20,12 @@ public:
 	void 				release();
 	bool				try_lock();
 	uint64_t 			get_tid();
-
-	void 				assert_lock() {assert(_tid_word & LOCK_BIT); }
+	void 				assert_lock() {/*assert(_tid_word & LOCK_BIT); */}
 private:
 #if ATOMIC_WORD
 	volatile uint64_t	_tid_word;
 #else
- 	pthread_mutex_t * 	_latch;
+	pthread_mutex_t * 	_latch;
 	ts_t 				_tid;
 #endif
 	row_t * 			_row;

@@ -13,6 +13,9 @@
 #include "mem_alloc.h"
 #include "test.h"
 
+extern __thread int *next_coro;
+extern __thread coro_call_t *coro_arr;
+
 void thread_t::init(uint64_t thd_id, workload * workload) {
 	_thd_id = thd_id;
 	_wl = workload;
@@ -37,7 +40,7 @@ void thread_t::set_cur_cid(uint64_t cid) {_cur_cid = cid; }
 
 int64_t starttime1, endtime1;
 
-RC thread_t::run() {
+RC thread_t::run(coro_yield_t &yield, int coro_id) {
 #if !NOGRAPHITE
 	_thd_id = CarbonGetTileId();
 #endif
@@ -134,7 +137,7 @@ RC thread_t::run() {
 			}
 #endif
 		}
-		INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
+		// INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
@@ -193,7 +196,7 @@ RC thread_t::run() {
 				rc = runTest(m_txn);
 			} else {
 				// starttime1 = get_server_clock();
-				rc = m_txn->run_txn(m_query);
+				rc = m_txn->run_txn(m_query, yield, coro_id);
 				// endtime1 = get_server_clock();
 			}
 #endif
@@ -268,14 +271,16 @@ RC thread_t::run() {
 			return FINISH;
 		}
 
-		if (warmup_finish && txn_cnt >= MAX_TXN_PER_PART) {
-			assert(txn_cnt == MAX_TXN_PER_PART);
-	        if( !ATOM_CAS(_wl->sim_done, false, true) )
-				assert( _wl->sim_done);
-	    }
-	    if (_wl->sim_done) {
+		// if (warmup_finish && txn_cnt >= MAX_TXN_PER_PART) {
+		// 	assert(txn_cnt == MAX_TXN_PER_PART);
+	    //     if( !ATOM_CAS(_wl->sim_done, false, true) )
+		// 		assert( _wl->sim_done);
+	    // }
+	    if (_wl->sim_done) { 
    		    return FINISH;
    		}
+		if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT))
+			yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 	}
 	assert(false);
 }

@@ -26,6 +26,7 @@ public:
 	void init(workload * h_wl, int thread_id);
 	base_query * get_next_query(); 
 	int q_idx;
+	int _request_cnt;
 #if WORKLOAD == YCSB
 	ycsb_query * queries;
 #else 

@@ -1,13 +1,13 @@
 CC=g++
-CFLAGS=-Wall -g -std=c++0x
+CFLAGS=-Wall -g -std=c++11
 
 .SUFFIXES: .o .cpp .h
 
 SRC_DIRS = ./ ./benchmarks/ ./concurrency_control/ ./storage/ ./system/
 INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system
 
-CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3
-LDFLAGS = -Wall -L. -L./libs -pthread -g -lrt -std=c++0x -O3 -ljemalloc -lprofiler
+CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3 
+LDFLAGS = -Wall -L. -L./libs -pthread -g -lrt -std=c++0x -O3 -ljemalloc -lprofiler -lboost_system -lboost_coroutine
 LDFLAGS += $(CFLAGS)
 
 CPPS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.cpp))

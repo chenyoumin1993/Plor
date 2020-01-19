@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "global.h"
+#include "coro.h"
 
 #define DECL_SET_VALUE(type) \
 	void set_value(int col_id, type value);
@@ -80,6 +81,7 @@ public:
 	void free_row();
 
 	// for concurrency control. can be lock, timestamp etc.
+	RC get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yield, int coro_id);
 	RC get_row(access_t type, txn_man * txn, row_t *& row);
 	void return_row(access_t type, txn_man * txn, row_t * row);
 

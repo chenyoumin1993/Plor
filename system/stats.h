@@ -65,4 +65,5 @@ public:
 	void abort(uint64_t thd_id);
 	void print();
 	void print_lat_distr();
+	void performance();
 };

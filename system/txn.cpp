@@ -120,6 +120,79 @@ void txn_man::cleanup(RC rc) {
 #endif
 }
 
+row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int coro_id) {
+	/* 
+	Accessed items are warpped inside Access structure, 
+	Some of them need to make a local copy (e.g., OCC, write-set in 2PL, etc), 
+	while others can be directly refered to.
+	*/
+	if (wound) {
+		// lock_cnt += 1;
+		// wound_cnt_discovered1 += 1;
+		// printf("%d wounded-1, cnt = %d\n", get_thd_id(), wound_cnt);
+		// return NULL;
+	}
+	if (CC_ALG == HSTORE)
+		return row;
+	uint64_t starttime = get_sys_clock();
+	RC rc = RCOK;
+	if (accesses[row_cnt] == NULL) {
+		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
+		accesses[row_cnt] = access;
+#if (CC_ALG == SILO || CC_ALG == TICTOC)
+		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
+		access->data->init(MAX_TUPLE_SIZE);
+		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
+		access->orig_data->init(MAX_TUPLE_SIZE);
+#elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT)
+		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
+		access->orig_data->init(MAX_TUPLE_SIZE);
+#endif
+		num_accesses_alloc ++;
+	}
+	/* 
+	Create a local copy in *data* if necessary.
+	Locks are acquired here, except OCC (validate in cleanup).
+	*/
+	rc = row->get_row(type, this, accesses[ row_cnt ]->data, yield, coro_id);
+
+
+	if (rc == Abort) {
+		return NULL;
+	}
+	accesses[row_cnt]->type = type;
+	accesses[row_cnt]->orig_row = row;
+#if CC_ALG == TICTOC
+	accesses[row_cnt]->wts = last_wts;
+	accesses[row_cnt]->rts = last_rts;
+#elif CC_ALG == SILO
+	accesses[row_cnt]->tid = last_tid;
+#elif CC_ALG == HEKATON
+	accesses[row_cnt]->history_entry = history_entry;
+#endif
+
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT)
+	if (type == WR) {
+		accesses[row_cnt]->orig_data->table = row->get_table();
+		accesses[row_cnt]->orig_data->copy(row);
+	}
+#endif
+
+#if (CC_ALG == NO_WAIT || CC_ALG == DL_DETECT) && ISOLATION_LEVEL == REPEATABLE_READ
+	if (type == RD)
+		row->return_row(type, this, accesses[ row_cnt ]->data);
+#endif
+	
+	row_cnt ++;
+	if (type == WR)
+		wr_cnt ++;
+
+	uint64_t timespan = get_sys_clock() - starttime;
+	INC_TMP_STATS(get_thd_id(), time_man, timespan);
+	return accesses[row_cnt - 1]->data;
+}
+
+
 row_t * txn_man::get_row(row_t * row, access_t type) {
 	/* 
 	Accessed items are warpped inside Access structure, 

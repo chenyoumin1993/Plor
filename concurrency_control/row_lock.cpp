@@ -13,7 +13,7 @@ void Row_lock::init(row_t * row) {
 	owner_cnt = 0;
 	waiter_cnt = 0;
 	woundee_cnt = 0;
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 	latch = new pthread_spinlock_t;
 	pthread_spin_init(latch, 0);
 #else
@@ -39,7 +39,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 		pthread_spin_lock( latch );
 #else
 		pthread_mutex_lock( latch );
@@ -283,7 +283,7 @@ final:
 	if (g_central_man)
 		glob_manager->release_row(_row);
 	else
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 		pthread_spin_unlock( latch );
 #else
 		pthread_mutex_unlock( latch );
@@ -297,7 +297,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 		pthread_spin_lock( latch );
 #else
 		pthread_mutex_lock( latch );
@@ -446,7 +446,7 @@ RC Row_lock::lock_release(txn_man * txn) {
 	if (g_central_man)
 		glob_manager->release_row(_row);
 	else
-#ifdef USE_SPINLOCK
+#if USE_SPINLOCK == 1
 		pthread_spin_unlock( latch );
 #else
 		pthread_mutex_unlock( latch );

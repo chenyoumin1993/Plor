@@ -14,6 +14,12 @@
 #include "row_vll.h"
 #include "mem_alloc.h"
 #include "manager.h"
+#include "wl.h"
+
+
+extern __thread int *next_coro;
+extern __thread coro_call_t *coro_arr;
+extern workload * m_wl;
 
 RC 
 row_t::init(table_t * host_table, uint64_t part_id, uint64_t row_id) {
@@ -121,6 +127,7 @@ char * row_t::get_value(char * col_name) {
 char * row_t::get_data() { return data; }
 
 void row_t::set_data(char * data, uint64_t size) { 
+	// ASSERT(this->data != data);
 	memcpy(this->data, data, size);
 }
 // copy from the src to this
@@ -132,11 +139,163 @@ void row_t::free_row() {
 	free(data);
 }
 
+RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yield, int coro_id) {
+	RC rc = RCOK;
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT
+	uint64_t thd_id = txn->get_thd_id();
+	lock_t lt = (type == RD || type == SCAN) ? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
+	txn->lock_ready = false;
+#if CC_ALG == DL_DETECT
+	uint64_t * txnids;
+	int txncnt; 
+	rc = this->manager->lock_get(lt, txn, txnids, txncnt);	
+#else
+	rc = this->manager->lock_get(lt, txn);
+#endif
+
+	if (rc == RCOK) {
+		row = this;
+	} else if (rc == Abort) {} 
+	else if (rc == WAIT) {
+		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT);
+		uint64_t starttime = get_sys_clock();
+#if CC_ALG == DL_DETECT	
+		bool dep_added = false;
+#endif
+		uint64_t endtime;
+		txn->lock_abort = false;
+		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
+		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
+#if CC_ALG == WAIT_DIE 
+			continue;
+#elif CC_ALG == WOUND_WAIT
+			// if ((endtime - starttime)/1000 > 10000) {
+			// 	printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
+			// 	this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
+			// 	usleep(100);
+			// 	uint64_t cnt = 0;
+			// 	while (true) cnt += 1;
+			// 	// ASSERT(false);
+			// }
+			if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT) && !m_wl->sim_done)
+				yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
+			continue;
+#elif CC_ALG == DL_DETECT
+			uint64_t last_detect = starttime;
+			uint64_t last_try = starttime;
+
+			uint64_t now = get_sys_clock();
+			if (now - starttime > g_timeout ) {
+				txn->lock_abort = true;
+				break;
+			}
+			if (g_no_dl) {
+				PAUSE
+				continue;
+			}
+			int ok = 0;
+			if ((now - last_detect > g_dl_loop_detect) && (now - last_try > DL_LOOP_TRIAL)) {
+				if (!dep_added) {
+					ok = dl_detector.add_dep(txn->get_txn_id(), txnids, txncnt, txn->row_cnt);
+					if (ok == 0)
+						dep_added = true;
+					else if (ok == 16)
+						last_try = now;
+				}
+				if (dep_added) {
+					ok = dl_detector.detect_cycle(txn->get_txn_id());
+					if (ok == 16)  // failed to lock the deadlock detector
+						last_try = now;
+					else if (ok == 0) 
+						last_detect = now;
+					else if (ok == 1) {
+						last_detect = now;
+					}
+				}
+			} else 
+				PAUSE
+#endif
+		}
+		if (txn->lock_ready) {
+			rc = RCOK;
+		}
+		else if (txn->lock_abort) { 
+			rc = Abort;
+			return_row(type, txn, NULL);
+		} else if (txn->wound) {
+		#ifdef DEBUG_WOUND
+			txn->wound_cnt_discovered +=1;
+			// printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);
+		#endif
+			rc = Abort;
+			return_row(type, txn, NULL);
+		}
+		endtime = get_sys_clock();
+		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
+		row = this;
+	}
+	return rc;
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == HEKATON 
+	uint64_t thd_id = txn->get_thd_id();
+	// For TIMESTAMP RD, a new copy of the row will be returned.
+	// for MVCC RD, the version will be returned instead of a copy
+	// So for MVCC RD-WR, the version should be explicitly copied.
+	//row_t * newr = NULL;
+  #if CC_ALG == TIMESTAMP
+	// TODO. should not call malloc for each row read. Only need to call malloc once 
+	// before simulation starts, like TicToc and Silo.
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t), this->get_part_id());
+	txn->cur_row->init(get_table(), this->get_part_id());
+  #endif
+
+	// TODO need to initialize the table/catalog information.
+	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
+	rc = this->manager->access(txn, ts_type, row);
+	if (rc == RCOK ) {
+		row = txn->cur_row;
+	} else if (rc == WAIT) {
+		uint64_t t1 = get_sys_clock();
+		while (!txn->ts_ready)
+			PAUSE
+		uint64_t t2 = get_sys_clock();
+		INC_TMP_STATS(thd_id, time_wait, t2 - t1);
+		row = txn->cur_row;
+	}
+	if (rc != Abort) {
+		row->table = get_table();
+		assert(row->get_schema() == this->get_schema());
+	}
+	return rc;
+#elif CC_ALG == OCC
+	// OCC always make a local copy regardless of read or write, no need for locking.
+	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t), get_part_id());
+	txn->cur_row->init(get_table(), get_part_id());
+	// access makes a local copy (i.e., cur_row)
+	// The manager is initialized when this row was created
+	rc = this->manager->access(txn, R_REQ);
+	// This is a new copy just made.
+	row = txn->cur_row;
+	return rc;
+#elif CC_ALG == TICTOC || CC_ALG == SILO
+	// like OCC, tictoc also makes a local copy for each read/write
+	row->table = get_table();
+	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
+	rc = this->manager->access(txn, ts_type, row);
+	return rc;
+#elif CC_ALG == HSTORE || CC_ALG == VLL
+	row = this;
+	return rc;
+#else
+	assert(false);
+#endif
+}
+
+
 RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	RC rc = RCOK;
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT
 	uint64_t thd_id = txn->get_thd_id();
-	lock_t lt = (type == RD || type == SCAN)? LOCK_SH : LOCK_EX;
+	lock_t lt = (type == RD || type == SCAN)? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
 	txn->lock_ready = false;
 #if CC_ALG == DL_DETECT
 	uint64_t * txnids;

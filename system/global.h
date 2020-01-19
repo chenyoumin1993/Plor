@@ -29,6 +29,8 @@
 #include "carbon_user.h"
 #endif
 
+#include <gperftools/profiler.h>
+
 using namespace std;
 
 class mem_alloc;
@@ -139,7 +141,7 @@ typedef uint64_t (*func_ptr)(idx_key_t);	// part_id func_ptr(index_key);
 /* general concurrency control */
 enum access_t {RD, WR, XP, SCAN};
 /* LOCK */
-enum lock_t {LOCK_EX, LOCK_SH, LOCK_NONE };
+enum lock_t {LOCK_EX = 4, LOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
 enum TsType {R_REQ, W_REQ, P_REQ, XP_REQ}; 
 

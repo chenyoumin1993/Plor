@@ -1,10 +1,14 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define THREAD_CNT 64
-#define CC_ALG WOUND_WAIT
+#define CORE_CNT 64
+#define CC_ALG SILO
 #define ZIPF_THETA 0.9
 #define READ_PERC 1
 #define WRITE_PERC 00
+#define USE_SPINLOCK 1
+#define ATOMIC_WORD false
+
+#define CORO_CNT 1
 
 // #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000
@@ -13,9 +17,11 @@
 #define LONG_TX_PERC 0.00125
 #define LONG_TX_EXEC_TIME 0
 
+#define THREAD_CNT (CORO_CNT * CORE_CNT)
+
 // #define DEBUG_WOUND 1
 
-#define USE_SPINLOCK 1
+// 
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
@@ -102,7 +108,6 @@
 // [TICTOC, SILO]
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT					"true"
-#define ATOMIC_WORD					true
 // [HSTORE]
 // when set to true, hstore will not access the global timestamp.
 // This is fine for single partition transactions. 
@@ -123,12 +128,12 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN				16
 #define QUERY_INTVL 				1UL
-#define MAX_TXN_PER_PART 			100000
+#define MAX_TXN_PER_PART 			10000
 #define FIRST_PART_LOCAL 			true
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(1024 * 1024)
+#define SYNTH_TABLE_SIZE 			(1024*1024)
 #define SCAN_PERC 					0
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
@@ -226,5 +231,5 @@ extern TestCases					g_test_case;
 #define TS_CAS						2
 #define TS_HW						3
 #define TS_CLOCK					4
-#include <gperftools/profiler.h>
+
 #endif

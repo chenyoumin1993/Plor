@@ -2,8 +2,14 @@
 #include "helper.h"
 #include "stats.h"
 #include "mem_alloc.h"
+#include "wl.h"
+#include <thread>
 
 #define BILLION 1000000000UL
+
+extern workload *m_wl;
+extern thread perf;
+extern bool start_perf;
 
 void Stats_thd::init(uint64_t thd_id) {
 	clear();
@@ -53,6 +59,7 @@ void Stats::init() {
 	dl_wait_time = 0;
 	deadlock = 0;
 	cycle_detect = 0;
+	perf = thread(&Stats::performance, this);
 }
 
 void Stats::init(uint64_t thread_id) {
@@ -121,12 +128,19 @@ void Stats::print() {
 	double total_time_ts_alloc = 0;
 	double total_latency = 0;
 	double total_time_query = 0;
+	int actual_thd_cnt = 0;
+	double rate = 0;
 	for (uint64_t tid = 0; tid < g_thread_cnt; tid ++) {
+		if (_stats[tid] == NULL) continue;
+		actual_thd_cnt += 1;
+		// printf("%d\t%p\n", tid, _stats[tid]);
 		total_txn_cnt += _stats[tid]->txn_cnt;
 		total_abort_cnt += _stats[tid]->abort_cnt;
+		rate += (double)_stats[tid]->txn_cnt / ((double)_stats[tid]->run_time / 1000000000);
 		total_run_time += _stats[tid]->run_time;
 		total_time_man += _stats[tid]->time_man;
 		total_debug1 += _stats[tid]->debug1;
+		// printf("%d\n", tid);
 		total_debug2 += _stats[tid]->debug2;
 		total_debug3 += _stats[tid]->debug3;
 		total_debug4 += _stats[tid]->debug4;
@@ -205,7 +219,7 @@ void Stats::print() {
 		total_debug5  // / BILLION 
 	);*/
 	
-	printf("%.2f\t", (double)(total_txn_cnt * g_thread_cnt) / (total_run_time / BILLION));
+	// printf("%.2f\t", (double)(total_txn_cnt * actual_thd_cnt) / (total_run_time / BILLION));
 	
 	// print_dis();
 
@@ -230,11 +244,13 @@ void Stats::print_lat_distr() {
 	// } 
 	uint64_t total_lat_dis[MAX_LAT];
 	double total_cnt = 0;
-	for (uint i = 0; i < g_thread_cnt; ++i)
+	for (uint i = 0; i < g_thread_cnt; ++i) {
+		if (_stats[i] == NULL) continue;
 		for (int j = 0; j < MAX_LAT; ++j) {
 			total_lat_dis[j] += _stats[i]->lat_dis[j];
 			total_cnt += (double)_stats[i]->lat_dis[j];
 		}
+	}
 
 
 	double tmp_cnt = 0;
@@ -262,14 +278,16 @@ void Stats::print_lat_distr() {
 			p_999 = true;
 		} 
 	}
-	printf("|\t");
+	// printf("|\t");
 	uint64_t total_abt_dis[MAX_LAT];
 	double total_abt = 0;
-	for (uint i = 0; i < g_thread_cnt; ++i)
+	for (uint i = 0; i < g_thread_cnt; ++i) {
+		if (_stats[i] == NULL) continue;
 		for (int j = 0; j < MAX_LAT; ++j) {
 			total_abt_dis[j] += _stats[i]->abort_dis[j];
 			total_abt += (double)_stats[i]->abort_dis[j];
 		}
+	}
 
 	double abt_cnt = 0;
 	p_50 = false;
@@ -301,10 +319,46 @@ void Stats::print_lat_distr() {
 		} 
 	}
 
-	printf("|\t");
+	// printf("|\t");
 	uint64_t cnt = 0;
 	for (uint  i = 0; i < g_thread_cnt; ++i) {
+		if (_stats[i] == NULL) continue;
 		cnt += _stats[i]->abort_cnt1;
 	}
 	printf("%lld\n", (long long)cnt);
+}
+
+
+void Stats::performance(){
+	while (!start_perf) usleep(10000);
+	// printf(".......%p\n", &(m_wl->sim_done));
+	sleep(1);
+	uint64_t old_total_cnt, new_total_cnt;
+	ts_t start_time, end_time;
+	double rate;
+	
+	old_total_cnt = new_total_cnt = 0;
+
+	for (int i = 0; i < (int)g_thread_cnt; ++i)
+		old_total_cnt += _stats[i]->txn_cnt;
+
+	// ProfilerStart("profile/prof");
+_start:
+	start_time = get_sys_clock();
+	sleep(4);
+	
+	new_total_cnt = 0;
+
+	for (int i = 0; i < (int)g_thread_cnt; ++i)
+		new_total_cnt += _stats[i]->txn_cnt;
+	
+	end_time = get_sys_clock();
+
+	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
+
+	printf("%.2f\t", rate);
+	old_total_cnt = new_total_cnt;
+	// ProfilerStop();
+	// goto _start;
+	ATOM_CAS(m_wl->sim_done, false, true);
 }
