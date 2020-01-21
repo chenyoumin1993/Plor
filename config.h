@@ -1,12 +1,12 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 64
-#define CC_ALG SILO
+#define CORE_CNT 32
+#define CC_ALG WOUND_WAIT
 #define ZIPF_THETA 0.9
-#define READ_PERC 1
-#define WRITE_PERC 00
-#define USE_SPINLOCK 1
-#define ATOMIC_WORD false
+#define READ_PERC 0
+#define WRITE_PERC 1
+#define USE_SPINLOCK 0
+#define ATOMIC_WORD true
 
 #define CORO_CNT 1
 
@@ -86,7 +86,7 @@
 #define TIMEOUT						1000000 // 1ms
 // [TIMESTAMP]
 #define TS_TWR						false
-#define TS_ALLOC					TS_CAS
+#define TS_ALLOC					TS_CAS //TS_CLOCK
 #define TS_BATCH_ALLOC				false
 #define TS_BATCH_NUM				1
 // [MVCC]
@@ -222,6 +222,7 @@ extern TestCases					g_test_case;
 #define VLL							10
 #define HEKATON 					11
 #define WOUND_WAIT					12
+#define OLOCK						13
 //Isolation Levels 
 #define SERIALIZABLE				1
 #define SNAPSHOT					2

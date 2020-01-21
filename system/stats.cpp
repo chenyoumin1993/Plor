@@ -225,6 +225,15 @@ void Stats::print() {
 
 	if (g_prt_lat_distr)
 		print_lat_distr();
+
+	uint64_t cnt = 0, abort_cnt2 = 0;
+	for (uint  i = 0; i < g_thread_cnt; ++i) {
+		if (_stats[i] == NULL) continue;
+		cnt += _stats[i]->abort_cnt1;
+		abort_cnt2 += _stats[i]->abort_cnt2;
+	}
+
+	printf("%.2f\t%.2f\n", (double)cnt / total_txn_cnt, (double)abort_cnt2 / total_txn_cnt);
 }
 
 void Stats::print_lat_distr() {
@@ -320,12 +329,6 @@ void Stats::print_lat_distr() {
 	}
 
 	// printf("|\t");
-	uint64_t cnt = 0;
-	for (uint  i = 0; i < g_thread_cnt; ++i) {
-		if (_stats[i] == NULL) continue;
-		cnt += _stats[i]->abort_cnt1;
-	}
-	printf("%lld\n", (long long)cnt);
 }
 
 
