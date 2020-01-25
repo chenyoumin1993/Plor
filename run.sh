@@ -8,13 +8,16 @@ replace()
 #CC_AGS=(WAIT_DIE NO_WAIT DL_DETECT TIMESTAMP MVCC HEKATON HSTORE OCC VLL TICTOC SILO)
 #CC_AGS=(WAIT_DIE NO_WAIT DL_DETECT MVCC OCC) # HSTORE)
 #CC_AGS=(WAIT_DIE NO_WAIT SILO TICTOC)
-CC_AGS=(WOUND_WAIT SILO)
+# CC_AGS=(WOUND_WAIT SILO)
+CC_AGS=(OLOCK)
 #CC_AGS=(WAIT_DIE NO_WAIT)
-MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
+#MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
+MAX_THD=(24 28 32 36 40 44 48 52 56 60 64)
 #MAX_THD=(36)
 #ZIPF=(0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.75 0.8 0.85 0.9 0.95 0.99)
-ZIPF=(0.1 0.7 0.75 0.8 0.85 0.9)
-READ=(0 0.5 1)
+#ZIPF=(0.1 0.7 0.75 0.8 0.85 0.9)
+ZIPF=(0.9)
+READ=(0)
 EXEC_TIME=(0 1 10 100 1000)
 EPOCH=(10 30 300 1000)
 #CC_AGS=(WAIT_DIE)
@@ -46,7 +49,9 @@ do
 	printf "%.2f\t%.2f\t%.2f\t%d\t%s\t%d\t" $rd $wt $zip $t $cc $exec_t
 	make clean &> /dev/null
 	make -j &> /dev/null
-	./rundb
+	sleep 2
+	timeout 10 ./rundb
+	printf "\n"
 done
 done
 done

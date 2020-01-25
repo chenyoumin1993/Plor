@@ -15,6 +15,9 @@
 
 extern __thread int *next_coro;
 extern __thread coro_call_t *coro_arr;
+char _pad1111[4096];
+txn_man *txn_tb[THREAD_CNT];
+char _pad2222[4096];
 
 void thread_t::init(uint64_t thd_id, workload * workload) {
 	_thd_id = thd_id;
@@ -60,7 +63,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 	rc = _wl->get_txn_man(m_txn, this);
 	assert (rc == RCOK);
 	glob_manager->set_txn_man(m_txn);
-
+	txn_tb[_thd_id] = m_txn;
 	base_query * m_query = NULL;
 	uint64_t thd_txn_id = 0;
 	UInt64 txn_cnt = 0;
@@ -141,7 +144,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		m_txn->abort_cnt = 0;
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
-		if (CC_ALG == WOUND_WAIT) {
+		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK) {
 		#ifdef DEBUG_WOUND
 			if (m_txn->wound) m_txn->wound_cnt += 1;
 			m_txn->last_wound = 0;
@@ -161,9 +164,10 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				|| CC_ALG == HEKATON
 				|| CC_ALG == TIMESTAMP
 				|| CC_ALG == WAIT_DIE
-				|| CC_ALG == WOUND_WAIT) 
+				|| CC_ALG == WOUND_WAIT
+				|| CC_ALG == OLOCK) 
 			m_txn->set_ts(get_next_ts());
-		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT) {
+		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
 				m_txn->set_ts(m_query->timestamp);

@@ -2,6 +2,8 @@
 #include <boost/lockfree/queue.hpp>
 #include <boost/atomic.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
+#include <mutex>
+#include <queue>
 
 #include <stdio.h>
 #include <sys/time.h>
@@ -10,20 +12,30 @@
 
 bool start1 = false, start2 = false;
 boost::atomic_int cnt1(0), cnt2(0);
+// std::queue<int> q;
+boost::lockfree::queue<int> q(1);
+// boost::lockfree::spsc_queue<int> q(1);
 
-// boost::lockfree::queue<int> q(1);
-boost::lockfree::spsc_queue<int> q(1);
+std::mutex mtx;
+uint64_t cnt;
 
 void producer(int id) {
     while (!start1) ;
-    for (int i = 0; i < MAX; ++i)
+    for (int i = 0; i < MAX; ++i) {
+	// mtx.lock();
         q.push(id * MAX + i);
+	// mtx.unlock();
+    }
     
     cnt1 += 1;
     int ret;
     while (!start2) ;
-    for (int i = 0; i < MAX; ++i)
+    for (int i = 0; i < MAX; ++i) {
+	// mtx.lock();
+        // q.pop();
         q.pop(ret);
+	// mtx.unlock();
+    }
     cnt2 += 1;
 }
 
@@ -50,6 +62,5 @@ int main(int argc, char **argv) {
     diff1 = (double)(T2.tv_sec - T1.tv_sec) * 1000000  + (double)(T2.tv_nsec - T1.tv_nsec) / 1000;
     diff2 = (double)(T3.tv_sec - T2.tv_sec) * 1000000  + (double)(T3.tv_nsec - T2.tv_nsec) / 1000;
     printf("%.4f\t%.4f\n", (double)(MAX * n_thd) / diff1, (double)(MAX * n_thd) / diff2);
-    printf("%lld\n", (long long)q.size());
     producers.join_all();
 }

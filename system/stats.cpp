@@ -233,7 +233,7 @@ void Stats::print() {
 		abort_cnt2 += _stats[i]->abort_cnt2;
 	}
 
-	printf("%.2f\t%.2f\n", (double)cnt / total_txn_cnt, (double)abort_cnt2 / total_txn_cnt);
+	printf("%.2f\t%.2f\t", (double)cnt / total_txn_cnt, (double)abort_cnt2 / total_txn_cnt);
 }
 
 void Stats::print_lat_distr() {
@@ -333,20 +333,19 @@ void Stats::print_lat_distr() {
 
 
 void Stats::performance(){
-	while (!start_perf) usleep(10000);
+	while (!start_perf) usleep(1000);
 	// printf(".......%p\n", &(m_wl->sim_done));
 	sleep(1);
 	uint64_t old_total_cnt, new_total_cnt;
 	ts_t start_time, end_time;
 	double rate;
-	
 	old_total_cnt = new_total_cnt = 0;
 
 	for (int i = 0; i < (int)g_thread_cnt; ++i)
 		old_total_cnt += _stats[i]->txn_cnt;
 
+// _start:
 	// ProfilerStart("profile/prof");
-_start:
 	start_time = get_sys_clock();
 	sleep(4);
 	
@@ -356,7 +355,6 @@ _start:
 		new_total_cnt += _stats[i]->txn_cnt;
 	
 	end_time = get_sys_clock();
-
 	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 
 	printf("%.2f\t", rate);

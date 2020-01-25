@@ -32,6 +32,8 @@ class Row_occ;
 class Row_tictoc;
 class Row_silo;
 class Row_vll;
+class Row_olock;
+class Row_dlock;
 
 class row_t
 {
@@ -88,6 +90,8 @@ public:
   // Mainly used to manage the lock.
   #if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
     Row_lock * manager;
+  #elif CC_ALG == OLOCK
+	Row_dlock * manager;
   #elif CC_ALG == TIMESTAMP
    	Row_ts * manager;
   #elif CC_ALG == MVCC

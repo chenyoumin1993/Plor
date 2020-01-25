@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 32
-#define CC_ALG WOUND_WAIT
+#define CORE_CNT 64
+#define CC_ALG OLOCK
 #define ZIPF_THETA 0.9
 #define READ_PERC 0
 #define WRITE_PERC 1

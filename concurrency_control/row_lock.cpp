@@ -174,7 +174,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				// 	txn->get_thd_id(), counter, lock_type, owner_cnt, waiter_cnt, woundee_cnt);
 				// }
 				// ASSERT(owners != NULL);
-				int temp = woundee_cnt;
+				// int temp = woundee_cnt;
 				while (en != NULL) {
 					en->txn->wound = true;
 					// printf("%d wound %d \n", (int)txn->get_thd_id(), (int)en->txn->get_thd_id());

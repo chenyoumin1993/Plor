@@ -78,7 +78,7 @@ public:
 	ts_t 			last_tid;
 #endif
 	
-	// For WOUND_WAIT
+	// For WOUND_WAIT and OLOCK
 	bool wound = false;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
@@ -98,12 +98,15 @@ public:
 	Access **		accesses;
 	int 			num_accesses_alloc;
 
+	// uint64_t w_cnt = 0;
+
 	// For VLL
 	TxnType 		vll_txn_type;
 	itemid_t *		index_read(INDEX * index, idx_key_t key, int part_id);
 	void 			index_read(INDEX * index, idx_key_t key, int part_id, itemid_t *& item);
 	row_t * 		get_row(row_t * row, access_t type, coro_yield_t &yield, int coro_id);
 	row_t * 		get_row(row_t * row, access_t type);
+	void *			reserve();
 protected:	
 	void 			insert_row(row_t * row, table_t * table);
 private:
@@ -128,5 +131,9 @@ private:
 	RC				validate_silo();
 #elif CC_ALG == HEKATON
 	RC 				validate_hekaton(RC rc);
+#endif
+#if CC_ALG == OLOCK
+	void* entries;
+	int n_entry;
 #endif
 };
