@@ -236,10 +236,15 @@ void Row_dlock::init(row_t *row) {
 }
 
 RC Row_dlock::lock_get(lock_t type, txn_man *txn) {
+    this->type = type;
+    if (type == LOCK_SH)
+        return RCOK;
     txn->lock_ready = false;
     // 2. Check if owner is NULL, become the owner if true.
-    Owner o0 = owner;
+    Owner o, o0, o1;
+    o = o0 = o1 = owner;
     o0.wound = 0;
+    o1.wound = 1;
     if (o0.owner == NULL) {
         // Try to become the owner.
         if (__sync_bool_compare_and_swap(&owner.owner, (uint64_t)NULL, (uint64_t)txn)) {
@@ -248,9 +253,7 @@ RC Row_dlock::lock_get(lock_t type, txn_man *txn) {
         }
     } else {
         // Try if I can wound it.
-        if (o0.owner->get_ts() > txn->get_ts() && !owner.wound) {
-            Owner o1 = owner;
-            o1.wound = 1;
+        if (o0.owner->get_ts() > txn->get_ts() && !o.wound) {
             if (__sync_bool_compare_and_swap(&owner.owner, (uint64_t)o0.owner, (uint64_t)o1.owner)) {
                 o0.owner->wound = true;
             }
@@ -262,25 +265,27 @@ RC Row_dlock::lock_get(lock_t type, txn_man *txn) {
 }
 
 RC Row_dlock::lock_release(txn_man *txn) {
-
     if (bmp->isSet(txn->get_thd_id()))
         bmp->Unset(txn->get_thd_id());
-    Owner o1, o2;
+    Owner o, o0, o1;
 
 _start:
-    o1 = o2 = owner;
-    o1.wound = 0;
-    if (o1.owner == txn && o2.wound) {
+    o = o0 = o1 = owner;
+    o0.wound = 0;
+    o1.wound = 1;
+    if (o0.owner == txn && o.wound) {
         // Someone else wound me, so I need to wait until wound arrive.
         while (txn->wound == false) {
+            PAUSE
             asm volatile ("lfence" ::: "memory");
         }
     }
 
     // find the oldest and make him the owner.
+    asm volatile ("lfence" ::: "memory");
     txn_man *txn_old = find_oldest(); // return NULL if empty.
 
-    if (!__sync_bool_compare_and_swap(&owner.owner, (uint64_t)o2.owner, (uint64_t)txn_old)) {
+    if (!__sync_bool_compare_and_swap(&owner.owner, (uint64_t)o.owner, (uint64_t)txn_old)) {
         // Someone is wounding me!
         goto _start;
     } else if (txn_old != NULL) {
@@ -291,12 +296,14 @@ _start:
 
 void Row_dlock::poll_lock_state(txn_man *txn) {
     // Check if the owner is empty so someone can become the new owner.
+    PAUSE
     asm volatile ("lfence" ::: "memory");
     Owner o, o0, o1;
     o = o0 = o1 = owner;
     o0.wound = 0;
     o1.wound = 1;
     if (o0.owner == NULL) {
+        assert(o.wound != 1);
         txn_man *txn_old = find_oldest(); // return NULL if empty.
         if (__sync_bool_compare_and_swap(&owner.owner, (uint64_t)NULL, (uint64_t)txn_old)) {
             if (txn_old != NULL)
@@ -307,7 +314,7 @@ void Row_dlock::poll_lock_state(txn_man *txn) {
         // wound it.
         if (__sync_bool_compare_and_swap(&owner.owner, (uint64_t)o0.owner, (uint64_t)o1.owner)) {
             // I can make sure it is still that owner.
-            ((txn_man *)o.owner)->wound = true;
+            o0.owner->wound = true;
         }
     }
 }

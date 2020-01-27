@@ -137,6 +137,7 @@ private:
     row_t *_row;
     Owner owner; // Only the owner can remove itself.
     BitMap *bmp;
+    lock_t type;
     txn_man* find_oldest();
 };
 

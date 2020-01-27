@@ -3,8 +3,8 @@
 #define CORE_CNT 64
 #define CC_ALG OLOCK
 #define ZIPF_THETA 0.9
-#define READ_PERC 0
-#define WRITE_PERC 1
+#define READ_PERC 0.5
+#define WRITE_PERC 0.5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
 
