@@ -1,4 +1,6 @@
 #include <thread>
+#include <execinfo.h>
+#include <signal.h>
 
 #include "global.h"
 #include "ycsb.h"
@@ -34,10 +36,23 @@ bool start_perf = false;
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
 
+void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
 int main(int argc, char* argv[])
 {
 	parser(argc, argv);
-	
+	signal(SIGSEGV, handler);
 	mem_allocator.init(g_part_cnt, MEM_SIZE / g_part_cnt); 
 	stats.init();
 	glob_manager = (Manager *) _mm_malloc(sizeof(Manager), 64);

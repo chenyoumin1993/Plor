@@ -241,6 +241,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 #elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
+		assert(access->orig_data != NULL);
 #endif
 		num_accesses_alloc ++;
 	}
@@ -267,6 +268,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
 	if (type == WR) {
+		assert(accesses[row_cnt]->orig_data != NULL);
 		accesses[row_cnt]->orig_data->table = row->get_table();
 		accesses[row_cnt]->orig_data->copy(row);
 	}
