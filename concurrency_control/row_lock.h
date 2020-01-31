@@ -15,7 +15,7 @@ public:
 	// [DL_DETECT] txnids are the txn_ids that current txn is waiting for.
     RC lock_get(lock_t type, txn_man * txn);
     RC lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt);
-    RC lock_release(txn_man * txn);
+    RC lock_release(lock_t type, txn_man * txn);
 	
 // private:
 #if USE_SPINLOCK == 1

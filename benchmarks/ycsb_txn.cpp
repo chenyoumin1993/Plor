@@ -88,7 +88,7 @@ RC ycsb_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
 
 #ifdef LONG_TX_ENABLE
 	if (m_query->exec_time > 0)
-		usleep(m_query->exec_time); // May be not accurate.
+		micro_sleep(m_query->exec_time); // May be not accurate.
 #endif
 	rc = RCOK;
 final:

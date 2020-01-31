@@ -6,6 +6,16 @@
 #include "global.h"
 #include "helper.h"
 
+inline void micro_sleep(int us) {
+	struct timespec T1, T2;
+	double diff = 0;
+	clock_gettime(CLOCK_MONOTONIC, &T1);
+	while (diff < us) {
+		clock_gettime(CLOCK_MONOTONIC, &T2);
+		diff = (T2.tv_sec - T1.tv_sec) * 1000000 + (T2.tv_nsec - T1.tv_nsec) / 1000;
+	}
+}
+
 class ycsb_query;
 
 class ycsb_wl : public workload {

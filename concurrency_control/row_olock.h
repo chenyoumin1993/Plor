@@ -19,7 +19,7 @@ struct OLockEntry {
 	};
 };
 
-
+#if CC_ALG == OLOCK
 struct Owner {
     union {
         struct {
@@ -29,6 +29,32 @@ struct Owner {
         txn_man *owner;
     };
 };
+
+#elif CC_ALG == DLOCK
+
+struct __attribute__((packed)) Owner {
+    union {
+        txn_man *_owner;
+        struct {
+        	uint8_t cnt;
+        	union {
+                uint8_t _cnt;
+                struct {
+                    uint8_t cnt_bak : 7;
+                    uint8_t wound : 1;
+                };
+            };
+            uint64_t owner : 48;
+        };
+        struct {
+            uint64_t _pad : 16;
+            uint64_t ex_mode : 32;
+            uint16_t thd_id : 16;
+        };
+    };
+};
+
+#endif
 
 struct BitMap {
     uint32_t _size;
@@ -63,34 +89,44 @@ struct BitMap {
     }
 
     void Set(uint off) { // Atomically
-        uint8_t _old, _new;
+        // uint8_t _old, _new;
         uint x, y;
         x = off >> 3;
         y = off & 0x7u;
-    _start:
-        _old = _new = arr[x];
-        _new |= (0x1u << y);
-        if (!__sync_bool_compare_and_swap(&arr[x], _old, _new)) {
-            asm volatile ("lfence" ::: "memory");
-            goto _start;
-        }
+    // _start:
+        // _old = _new = arr[x];
+        // _new |= (0x1u << y);
+        // if (!__sync_bool_compare_and_swap(&arr[x], _old, _new)) {
+        __sync_fetch_and_add(&arr[x], (0x1u << y));
+        //     asm volatile ("lfence" ::: "memory");
+        //     goto _start;
+        // }
     }
 
     void Unset(uint off) { // Atomically
-        uint8_t _old, _new;
+        // uint8_t _old, _new;
         uint x, y;
         x = off >> 3;
         y = off & 0x7u;
-    _start:
-        _old = _new = arr[x];
-        _new &= ~(0x1u << y);
-        if (!__sync_bool_compare_and_swap(&arr[x], _old, _new)) {
-            asm volatile ("lfence" ::: "memory");
-            goto _start;
-        }
+    // _start:
+        // _old = _new = arr[x];
+        // _new &= ~(0x1u << y);
+        // if (!__sync_bool_compare_and_swap(&arr[x], _old, _new)) {
+        __sync_fetch_and_add(&arr[x], -(0x1u << y));
+        //     asm volatile ("lfence" ::: "memory");
+        //     goto _start;
+        // }
     }
 };
 
+inline uint countSetBits(int n) {
+	uint count = 0; 
+	while (n) { 
+		n &= (n - 1); 
+		count ++;
+	}
+	return count;
+}
 
 inline bool is_mark_set(uint64_t addr) {
 	return (addr & 0x1ull) == 1;
@@ -105,11 +141,13 @@ inline void unset_mark(uint64_t *addr) {
 		*addr -= 0x1ull;
 }
 
+#if CC_ALG == OLOCK
+
 class Row_olock {
 public:
     void init(row_t *row);
     RC lock_get(lock_t type, txn_man *txn);
-    RC lock_release(txn_man *txn);
+    RC lock_release(lock_t type, txn_man *txn);
     void poll_lock_state(txn_man *txn);
 
 private:
@@ -125,20 +163,29 @@ private:
     // boost::lockfree::queue<uint64_t, boost::lockfree::capacity<400>> queue;
 };
 
+#elif CC_ALG == DLOCK
+
 class Row_dlock {
 public:
     void init(row_t *row);
     RC lock_get(lock_t type, txn_man *txn);
-    RC lock_release(txn_man *txn);
+    RC lock_release(lock_t type, txn_man *txn);
     void poll_lock_state(txn_man *txn);
 
 private:
     // ...
     row_t *_row;
     Owner owner; // Only the owner can remove itself.
-    BitMap *bmp;
-    lock_t type;
+    BitMap *bmpWr;
+    BitMap *bmpRd;
+    uint8_t s_lock;
+    uint64_t readers;
     txn_man* find_oldest();
+    RC lock_get_sh(lock_t type, txn_man *txn);
+    RC lock_get_ex(lock_t type, txn_man *txn);
+    RC lock_release_sh(lock_t type, txn_man *txn);
+    RC lock_release_ex(lock_t type, txn_man *txn);
 };
+#endif
 
 #endif

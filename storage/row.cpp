@@ -45,9 +45,11 @@ row_t::switch_schema(table_t * host_table) {
 }
 
 void row_t::init_manager(row_t * row) {
-#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE
+#if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
     manager = (Row_lock *) mem_allocator.alloc(sizeof(Row_lock), _part_id);
 #elif CC_ALG == OLOCK
+	manager = (Row_olock *) mem_allocator.alloc(sizeof(Row_dlock), _part_id);
+#elif CC_ALG == DLOCK
 	manager = (Row_dlock *) mem_allocator.alloc(sizeof(Row_dlock), _part_id);
 #elif CC_ALG == TIMESTAMP
     manager = (Row_ts *) mem_allocator.alloc(sizeof(Row_ts), _part_id);
@@ -144,7 +146,7 @@ void row_t::free_row() {
 
 RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yield, int coro_id) {
 	RC rc = RCOK;
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
 	uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
 	txn->lock_ready = false;
@@ -160,7 +162,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		row = this;
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
-		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK);
+		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
 		uint64_t starttime = get_sys_clock();
 #if CC_ALG == DL_DETECT	
 		bool dep_added = false;
@@ -183,7 +185,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 			if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT) && !m_wl->sim_done)
 				yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 			continue;
-#elif CC_ALG == OLOCK
+#elif CC_ALG == OLOCK || CC_ALG == DLOCK
 			this->manager->poll_lock_state(txn);
 			if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT) && !m_wl->sim_done)
 				yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
@@ -301,7 +303,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 
 RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	RC rc = RCOK;
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
 	uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN)? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
 	txn->lock_ready = false;
@@ -317,7 +319,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		row = this;
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
-		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK);
+		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
 		uint64_t starttime = get_sys_clock();
 #if CC_ALG == DL_DETECT	
 		bool dep_added = false;
@@ -338,7 +340,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 			// 	// ASSERT(false);
 			// }
 			continue;
-#elif CC_ALG == OLOCK
+#elif CC_ALG == OLOCK || CC_ALG == DLOCK
 			this->manager->poll_lock_state(txn);
 			continue;
 #elif CC_ALG == DL_DETECT	
@@ -459,12 +461,15 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (cf. row_ts.cpp)
 void row_t::return_row(access_t type, txn_man * txn, row_t * row) {	
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
 	assert (row == NULL || row == this || type == XP);
 	if (ROLL_BACK && type == XP) {// recover from previous writes.
 		this->copy(row);
 	}
-	this->manager->lock_release(txn);
+	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;
+
+	this->manager->lock_release(lt, txn);
+
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC 
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD

@@ -91,6 +91,8 @@ public:
   #if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
     Row_lock * manager;
   #elif CC_ALG == OLOCK
+	Row_olock * manager;  
+  #elif CC_ALG == DLOCK
 	Row_dlock * manager;
   #elif CC_ALG == TIMESTAMP
    	Row_ts * manager;

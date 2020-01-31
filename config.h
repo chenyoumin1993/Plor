@@ -1,10 +1,10 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define CORE_CNT 64
-#define CC_ALG OLOCK
+#define CC_ALG SILO
 #define ZIPF_THETA 0.9
-#define READ_PERC 0.5
-#define WRITE_PERC 0.5
+#define READ_PERC 0.9
+#define WRITE_PERC .1
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
 
@@ -14,7 +14,7 @@
 #define EPOCH_LENGTH 1000
 
 #define LONG_TX_ENABLE 1
-#define LONG_TX_PERC 0.00125
+#define LONG_TX_PERC 1//0.00125
 #define LONG_TX_EXEC_TIME 0
 
 #define THREAD_CNT (CORO_CNT * CORE_CNT)
@@ -25,7 +25,7 @@
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define PART_CNT					1 
+#define PART_CNT					1
 // each transaction only accesses 1 virtual partition. But the lock/ts manager and index are not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
 #define VIRTUAL_PART_CNT			1
 #define PAGE_SIZE					4096 
@@ -95,7 +95,7 @@
 //#define HIS_RECYCLE_LEN				10
 //#define MAX_PRE_REQ					1024
 //#define MAX_READ_REQ				1024
-#define MIN_TS_INTVL				5000000 //5 ms. In nanoseconds
+#define MIN_TS_INTVL				5000000 // 5 ms. In nanoseconds
 // [OCC]
 #define MAX_WRITE_SET				10
 #define PER_ROW_VALID				true
@@ -106,7 +106,7 @@
 #define WRITE_PERMISSION_LOCK		false
 #define ATOMIC_TIMESTAMP			"false"
 // [TICTOC, SILO]
-#define VALIDATION_LOCK				"no-wait" // no-wait or waiting
+#define VALIDATION_LOCK				"waiting" // "no-wait" // no-wait or waiting
 #define PRE_ABORT					"true"
 // [HSTORE]
 // when set to true, hstore will not access the global timestamp.
@@ -114,6 +114,8 @@
 #define HSTORE_LOCAL_TS				false
 // [VLL] 
 #define TXN_QUEUE_SIZE_LIMIT		THREAD_CNT
+// [DLOCK]
+#define EX_MODE 0x1314
 
 /***********************************************/
 // Logging
@@ -223,6 +225,7 @@ extern TestCases					g_test_case;
 #define HEKATON 					11
 #define WOUND_WAIT					12
 #define OLOCK						13
+#define DLOCK						14
 //Isolation Levels 
 #define SERIALIZABLE				1
 #define SNAPSHOT					2

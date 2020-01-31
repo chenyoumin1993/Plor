@@ -293,7 +293,7 @@ final:
 }
 
 
-RC Row_lock::lock_release(txn_man * txn) {	
+RC Row_lock::lock_release(lock_t type, txn_man * txn) {	
 	if (g_central_man)
 		glob_manager->lock_row(_row);
 	else 

@@ -80,6 +80,7 @@ public:
 	
 	// For WOUND_WAIT and OLOCK
 	bool wound = false;
+	bool ex_mode = false;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
 	int wound_cnt_discovered = 0;

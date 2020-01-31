@@ -144,7 +144,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		m_txn->abort_cnt = 0;
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
-		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK) {
+		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK) {
 		#ifdef DEBUG_WOUND
 			if (m_txn->wound) m_txn->wound_cnt += 1;
 			m_txn->last_wound = 0;
@@ -152,6 +152,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			m_txn->cur_owner_id = 0;
 		#endif
 			m_txn->wound = false;
+			m_txn->ex_mode = false;  // for olock/dlock only.
 		}
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
@@ -165,9 +166,10 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				|| CC_ALG == TIMESTAMP
 				|| CC_ALG == WAIT_DIE
 				|| CC_ALG == WOUND_WAIT
-				|| CC_ALG == OLOCK) 
+				|| CC_ALG == OLOCK
+				|| CC_ALG == DLOCK) 
 			m_txn->set_ts(get_next_ts());
-		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK) {
+		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
 				m_txn->set_ts(m_query->timestamp);
