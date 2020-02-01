@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 64
-#define CC_ALG SILO
+#define CORE_CNT 36
+#define CC_ALG NO_WAIT
 #define ZIPF_THETA 0.9
 #define READ_PERC 0.9
 #define WRITE_PERC .1
@@ -106,7 +106,7 @@
 #define WRITE_PERMISSION_LOCK		false
 #define ATOMIC_TIMESTAMP			"false"
 // [TICTOC, SILO]
-#define VALIDATION_LOCK				"waiting" // "no-wait" // no-wait or waiting
+#define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT					"true"
 // [HSTORE]
 // when set to true, hstore will not access the global timestamp.
