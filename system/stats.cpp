@@ -191,7 +191,7 @@ void Stats::print() {
 		);
 		fclose(outf);
 	}
-	/*printf("[summary] txn_cnt=%ld, abort_cnt=%ld"
+	/* printf("[summary] txn_cnt=%ld, abort_cnt=%ld"
 		", run_time=%f, rxn_rate=%.2f, time_wait=%f, time_ts_alloc=%f"
 		", time_man=%f, time_index=%f, time_abort=%f, time_cleanup=%f, latency=%f"
 		", deadlock_cnt=%ld, cycle_detect=%ld, dl_detect_time=%f, dl_wait_time=%f"
@@ -217,7 +217,7 @@ void Stats::print() {
 		total_debug3, // / BILLION,
 		total_debug4, // / BILLION,
 		total_debug5  // / BILLION 
-	);*/
+	); */
 	
 	// printf("%.2f\t", (double)(total_txn_cnt * actual_thd_cnt) / (total_run_time / BILLION));
 	
@@ -333,7 +333,7 @@ void Stats::print_lat_distr() {
 
 
 void Stats::performance(){
-	while (!start_perf) usleep(1000);
+	while (!start_perf) usleep(10);
 	// printf(".......%p\n", &(m_wl->sim_done));
 	sleep(1);
 	uint64_t old_total_cnt, new_total_cnt;
@@ -347,7 +347,7 @@ void Stats::performance(){
 // _start:
 	// ProfilerStart("profile/prof");
 	start_time = get_sys_clock();
-	sleep(4);
+	sleep(3);
 	
 	new_total_cnt = 0;
 

@@ -1,12 +1,13 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 36
-#define CC_ALG NO_WAIT
+#define CORE_CNT 64
+#define CC_ALG SILO
 #define ZIPF_THETA 0.9
-#define READ_PERC 0.9
-#define WRITE_PERC .1
+#define READ_PERC 1
+#define WRITE_PERC 0
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
+#define WORKLOAD YCSB
 
 #define CORO_CNT 1
 
@@ -36,14 +37,13 @@
 // # of transactions to run for warmup
 #define WARMUP						0
 // YCSB or TPCC
-#define WORKLOAD 					TPCC
 // print the transaction latency distribution
 #define PRT_LAT_DISTR					true	
 #define STATS_ENABLE					true
-#define TIME_ENABLE					true 
+#define TIME_ENABLE					true
 #define MAX_LAT						100000
 
-#define MEM_ALLIGN					8 
+#define MEM_ALLIGN					8
 
 // [THREAD_ALLOC]
 #define THREAD_ALLOC				false
@@ -69,7 +69,7 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN					false
 #define BUCKET_CNT					31
-#define ABORT_PENALTY 				100000
+#define ABORT_PENALTY 				0
 #define ABORT_BUFFER_SIZE			10
 #define ABORT_BUFFER_ENABLE			true
 // [ INDEX ]
@@ -130,17 +130,17 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN				64
 #define QUERY_INTVL 				1UL
-#define MAX_TXN_PER_PART 			10000
+#define MAX_TXN_PER_PART 			100000
 #define FIRST_PART_LOCAL 			true
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(1024*1024)
+#define SYNTH_TABLE_SIZE 			(1000 * 1000)
 #define SCAN_PERC 					0
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
 #define PERC_MULTI_PART				1
-#define REQ_PER_QUERY				8
+#define REQ_PER_QUERY				16
 #define FIELD_PER_TUPLE				10
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
@@ -151,7 +151,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL 			false 
 #define WH_UPDATE					true
-#define NUM_WH 						THREAD_CNT
+#define NUM_WH 						1// THREAD_CNT
 //
 enum TPCCTxnType {TPCC_ALL, 
 				TPCC_PAYMENT, 

@@ -97,7 +97,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 						// No avaiable slot, but too much aborted txs, sleep here.
 						M_ASSERT(min_ready_time >= curr_time, "min_ready_time=%ld, curr_time=%ld\n", min_ready_time, curr_time);
 						// starttime1 = get_sys_clock();
-						usleep((min_ready_time - curr_time));
+						usleep((min_ready_time - curr_time) / 1000);
 						// while ((curr_time) < min_ready_time) {
 						// 	curr_time = get_sys_clock();
 						// }

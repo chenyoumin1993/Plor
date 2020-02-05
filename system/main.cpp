@@ -95,10 +95,8 @@ int main(int argc, char* argv[])
 #elif CC_ALG == VLL
 	vll_man.init();
 #endif
-
 	for (uint32_t i = 0; i < thd_cnt; i++) 
 		m_thds[i]->init(i, m_wl);
-
 	if (WARMUP > 0){
 		// printf("WARMUP start!\n");
 #ifdef USE_EPOCH

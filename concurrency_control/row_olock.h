@@ -119,6 +119,47 @@ struct BitMap {
     }
 };
 
+struct SharedLockItem {
+    uint16_t _lt[4]; // 64-bit
+    SharedLockItem() {
+        uint64_t *lt = (uint64_t *)_lt;
+        *lt = 0;
+    };
+
+    bool lock(uint16_t thd_id) {
+        for (int i = 0; i < 4; ++i) {
+            uint16_t old = _lt[i];
+            if (old == 0) {
+                // reserve this lock.
+                if (__sync_bool_compare_and_swap(&_lt[i], old, thd_id))
+                    return true;
+            }
+            // Check more lock states.
+        }
+        return false;
+    }
+
+    bool unlock(uint16_t thd_id) {
+        for (int i = 0; i < 4; ++i) {
+            if (_lt[i] == thd_id) {
+                __sync_bool_compare_and_swap(&_lt[i], thd_id, 0);
+                return true;
+            }
+        }
+        return false;
+    }
+};
+/*
+struct LockBuffer __attribute__((aligned(64))) {
+    uint64_t items[THREAD_CNT];
+    bool lock(int off, uint64_t lt) {
+        // For sure, no overlapping.
+        items[off % THREAD_CNT] = lt;
+    }
+    bool unlock() {}
+};
+*/
+
 inline uint countSetBits(int n) {
 	uint count = 0; 
 	while (n) { 
