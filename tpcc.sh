@@ -8,8 +8,8 @@ replace()
 #CC_AGS=(WOUND_WAIT DLOCK SILO)
 #MAX_THD=(1 4 8 12 16 20 24 28 32 36)
 CC_AGS=(SILO)
-#MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
-MAX_THD=(36 40 44 48 52 56 60 64)
+MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
+#MAX_THD=(36 40 44 48 52 56 60 64)
 
 printf "\tT\tCC\tTP\tP50\tP90\tP99\tP999\tAbt\n"
 for cc in ${CC_AGS[@]}
@@ -23,7 +23,7 @@ do
 	make clean &> /dev/null
 	make -j &> /dev/null
 	sleep 2
-	timeout 30 ./rundb
+	timeout 60 ./rundb
 	printf "\n"
 done
 done
