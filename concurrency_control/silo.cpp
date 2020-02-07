@@ -69,6 +69,7 @@ txn_man::validate_silo()
 					goto final;
 				}
 			}
+			asm volatile ("sfence" ::: "memory");
 			if (num_locks == wr_cnt)
 				done = true;
 			else {
@@ -137,12 +138,14 @@ final:
 	if (rc == Abort) {
 		for (int i = 0; i < num_locks; i++) 
 			accesses[ write_set[i] ]->orig_row->manager->release();
+		asm volatile ("sfence" ::: "memory");
 		cleanup(rc);
 	} else {
 		for (int i = 0; i < wr_cnt; i++) {
 			Access * access = accesses[ write_set[i] ];
 			access->orig_row->manager->write( 
 				access->data, _cur_tid );
+			asm volatile ("sfence" ::: "memory");
 			accesses[ write_set[i] ]->orig_row->manager->release();
 		}
 		cleanup(rc);

@@ -6,6 +6,7 @@
 
 extern txn_man *txn_tb[];
 
+RingBuffer la[THREAD_CNT][BUFFER_LEN]; // Per-thread locking table.
 
 #if CC_ALG == OLOCK
 
@@ -301,6 +302,17 @@ _start:
     }
     // Add myself to the bmp and wait.
     bmpWr->Set(txn->get_thd_id());
+
+    // if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
+    //     bmpWr->Set(txn->get_thd_id());
+    // } else {
+    //     if (!dirLock.lock(txn->get_thd_id(), type)) {
+    //         // No available slots in dirLock.
+    //         if (!writeLock.lock(txn->get_thd_id())) {
+    //             return Abort;
+    //         }
+    //     }
+    // }
     return WAIT;
 }
 
@@ -350,6 +362,17 @@ _start:
 
     // Add myself to the bmp and go.
     bmpRd->Set(txn->get_thd_id());
+
+    // if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
+    //     bmpRd->Set(txn->get_thd_id());
+    // } else {
+    //     if (!dirLock.lock(txn->get_thd_id(), type)) {
+    //         // No available slots in dirLock.
+    //         if (!readLock.lock(txn->get_thd_id())) {
+    //             return Abort;
+    //         }
+    //     }
+    // }
     // asm volatile ("lfence" ::: "memory");
     // __sync_fetch_and_add(&readers, 1);
     return RCOK;

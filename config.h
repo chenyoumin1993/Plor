@@ -1,15 +1,16 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 64
-#define CC_ALG SILO
+#define CORE_CNT 20
+#define CC_ALG DLOCK
 #define ZIPF_THETA 0.9
 #define READ_PERC 0.5
-#define WRITE_PERC 0.5
+#define WRITE_PERC .5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 
 #define CORO_CNT 1
+#define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
 
 // #define USE_EPOCH 1
 #define EPOCH_LENGTH 1000
@@ -69,7 +70,7 @@
 // per-row lock/ts management or central lock/ts management
 #define CENTRAL_MAN					false
 #define BUCKET_CNT					31
-#define ABORT_PENALTY 				0
+#define ABORT_PENALTY 				100000
 #define ABORT_BUFFER_SIZE			10
 #define ABORT_BUFFER_ENABLE			true
 // [ INDEX ]

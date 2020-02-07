@@ -50,9 +50,9 @@ Row_silo::validate(ts_t tid, bool in_write_set) {
 	if (in_write_set)
 		return tid == (v & (~LOCK_BIT));
 
-	if (v & LOCK_BIT) 
+	if (v & LOCK_BIT) // Locked.
 		return false;
-	else if (tid != (v & (~LOCK_BIT)))
+	else if (tid != (v & (~LOCK_BIT)))  // Version changed.
 		return false;
 	else 
 		return true;
