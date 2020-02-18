@@ -37,25 +37,19 @@ struct __attribute__((packed)) Owner {
     union {
         txn_man *_owner;
         struct {
-        	uint8_t cnt;
+        	uint8_t tid;
         	union {
-                uint8_t _cnt;
+                uint8_t pad;
                 struct {
-                    uint8_t cnt_bak : 7;
+                    uint8_t _pad : 7;
                     uint8_t wound : 1;
                 };
             };
             uint64_t owner : 48;
         };
-        struct {
-            uint64_t _pad : 16;
-            uint64_t ex_mode : 32;
-            uint16_t thd_id : 16;
-        };
     };
 };
 
-#endif
 
 struct BitMap {
     uint32_t _size;
@@ -119,6 +113,8 @@ struct BitMap {
         // }
     }
 };
+
+#endif
 
 struct DirectLockItem {
     uint8_t _lt[8]; // 64-bit
@@ -290,8 +286,8 @@ struct LockItem {
                 la[ID][off].e[loc % RING_SIZE].ts = 0;
             }
 
-        if (loc == head) {
-            assert(false);
+        if (loc == head) { // Cannot find myself. Possible.
+            return false;
         }
 
         asm volatile ("sfence" ::: "memory");

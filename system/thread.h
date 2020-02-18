@@ -7,6 +7,7 @@
 class workload;
 class base_query;
 
+
 class thread_t {
 public:
 	uint64_t _thd_id;
@@ -44,7 +45,8 @@ private:
 	int _abort_buffer_size;
 	int _abort_buffer_empty_slots;
 	bool _abort_buffer_enable;
-#ifdef USE_EPOCH
+	uint32_t seed;
+#if PENALTY_POLICY == 2
 	std::queue<base_query*> *_epoch_buffer;
 	uint64_t local_epoch_cnt = 0;
 #endif

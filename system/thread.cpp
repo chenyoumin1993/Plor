@@ -29,7 +29,7 @@ void thread_t::init(uint64_t thd_id, workload * workload) {
 		_abort_buffer[i].query = NULL;
 	_abort_buffer_empty_slots = _abort_buffer_size;
 	_abort_buffer_enable = (g_params["abort_buffer_enable"] == "true");
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 	// _epoch_buffer.reserve(1024 * 1024);
 	_epoch_buffer = new std::queue<base_query*>;
 #endif
@@ -71,7 +71,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 	while (true) {
 		ts_t starttime = get_sys_clock();
 		if (WORKLOAD != TEST) {
-#ifndef USE_EPOCH
+#if PENALTY_POLICY == 0
 			int trial = 0;
 			if (_abort_buffer_enable) {
 				m_query = NULL;
@@ -96,25 +96,28 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 						assert(trial == 0);
 						// No avaiable slot, but too much aborted txs, sleep here.
 						M_ASSERT(min_ready_time >= curr_time, "min_ready_time=%ld, curr_time=%ld\n", min_ready_time, curr_time);
-						// starttime1 = get_sys_clock();
 						usleep((min_ready_time - curr_time) / 1000);
-						// while ((curr_time) < min_ready_time) {
-						// 	curr_time = get_sys_clock();
-						// }
-						
-						// endtime1 = get_sys_clock();
-						// DIS_STATS(get_thd_id(), lat_dis, (endtime1 - starttime1)/100);
-						// DIS_STATS(get_thd_id(), lat_dis, (min_ready_time - curr_time));
-					}
-					else if (m_query == NULL) {
+					} else if (m_query == NULL) {
 						// Otherwise, get a new reuqest (have enough slot, and all )
 						m_query = query_queue->get_next_query( _thd_id );
-					// #if CC_ALG == WAIT_DIE
-					// 	m_txn->set_ts(get_next_ts());
-					// #endif
 					}
 					if (m_query != NULL)
 						break;
+				}
+			} else {
+				if (rc == RCOK)
+					m_query = query_queue->get_next_query( _thd_id );
+			}
+#elif PENALTY_POLICY == 1  // ONLY HAS ONE SLOT
+			int trial = 0;
+			if (_abort_buffer_enable) {
+				m_query = NULL;
+				if (_abort_buffer[0].query != NULL) {
+					m_query = _abort_buffer[0].query;
+					_abort_buffer[0].query = NULL;
+					_abort_buffer_empty_slots ++;
+				} else {
+					m_query = query_queue->get_next_query( _thd_id );
 				}
 			} else {
 				if (rc == RCOK)
@@ -140,11 +143,12 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			}
 #endif
 		}
+		stats._stats[get_thd_id()]->try_cnt += 1;
 		// INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
-		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK) {
+		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK || CC_ALG == HLOCK) {
 		#ifdef DEBUG_WOUND
 			if (m_txn->wound) m_txn->wound_cnt += 1;
 			m_txn->last_wound = 0;
@@ -152,7 +156,13 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			m_txn->cur_owner_id = 0;
 		#endif
 			m_txn->wound = false;
+			m_txn->waiting = false;
 			m_txn->ex_mode = false;  // for olock/dlock only.
+			// if (m_txn->lock_holding != m_txn->lock_releasing) {
+			// 	printf("locked = %d, released = %d\n", m_txn->lock_holding, m_txn->lock_releasing);
+			// 	assert(m_txn->lock_holding == m_txn->lock_releasing);
+			// }
+			// m_txn->lock_holding = m_txn->lock_releasing = 0;
 		}
 //#if CC_ALG == VLL
 //		_wl->get_txn_man(m_txn, this);
@@ -167,15 +177,17 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				|| CC_ALG == WAIT_DIE
 				|| CC_ALG == WOUND_WAIT
 				|| CC_ALG == OLOCK
-				|| CC_ALG == DLOCK) 
+				|| CC_ALG == DLOCK
+				|| CC_ALG == HLOCK) 
 			m_txn->set_ts(get_next_ts());
-		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK) {
+		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK || CC_ALG == HLOCK) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
 				m_txn->set_ts(m_query->timestamp);
 			} else {
 				m_query->timestamp = m_txn->get_ts();
 			}
+			asm volatile ("sfence" ::: "memory");
 		}
 
 		rc = RCOK;
@@ -218,7 +230,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			m_query->abort_cnt += 1;
 			stats._stats[get_thd_id()]->abort_cnt1 += 1;
 			uint64_t penalty = 0;
-#ifndef USE_EPOCH
+#if PENALTY_POLICY == 0
 			if (ABORT_PENALTY != 0)  {
 				double r;
 				drand48_r(&buffer, &r);
@@ -237,6 +249,22 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 						break;
 					}
 				}
+			}
+#elif PENALTY_POLICY == 1
+			if (!_abort_buffer_enable)
+				usleep(penalty / 1000);
+			else {
+				assert(_abort_buffer_empty_slots > 0);
+				assert(_abort_buffer[0].query == NULL);
+				_abort_buffer[0].query = m_query;
+				if (m_query->abort_cnt < 10)
+					m_query->backoff <<= 1;
+				// wait cycles.
+				uint64_t cycles_to_wait = rand_r(&seed) % m_query->backoff;
+				// double r;
+				// drand48_r(&buffer, &r);
+				// uint64_t cycles_to_wait = r * m_query->backoff;
+				wait_cycles(cycles_to_wait);
 			}
 #else
 			// Put the aborted TX in _epoch_buffer.

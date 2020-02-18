@@ -60,7 +60,7 @@ double g_perc_payment = PERC_PAYMENT;
 bool g_wh_update = WH_UPDATE;
 char * output_file = NULL;
 
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 uint64_t epoch_cnt = 0;
 UInt32 epoch_length = EPOCH_LENGTH;
 #endif

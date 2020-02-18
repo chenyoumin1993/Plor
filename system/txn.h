@@ -27,7 +27,7 @@ public:
 #if CC_ALG == TICTOC
 	ts_t 		wts;
 	ts_t 		rts;
-#elif CC_ALG == SILO
+#elif (CC_ALG == SILO || CC_ALG == HLOCK)
 	ts_t 		tid;
 	ts_t 		epoch;
 #elif CC_ALG == HEKATON
@@ -74,12 +74,15 @@ public:
 	void 			update_max_wts(ts_t max_wts);
 	ts_t 			last_wts;
 	ts_t 			last_rts;
-#elif CC_ALG == SILO
+#elif (CC_ALG == SILO || CC_ALG == HLOCK)
 	ts_t 			last_tid;
+	// uint64_t lock_holding;
+	// uint64_t lock_releasing;
 #endif
 	
 	// For WOUND_WAIT and OLOCK
 	bool wound = false;
+	bool waiting = false;
 	bool ex_mode = false;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
@@ -118,7 +121,7 @@ private:
 	ts_t 			timestamp;
 
 	bool _write_copy_ptr;
-#if CC_ALG == TICTOC || CC_ALG == SILO
+#if (CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK)
 	bool 			_pre_abort;
 	bool 			_validation_no_wait;
 #endif
@@ -127,9 +130,13 @@ private:
 	ts_t 			_max_wts;
 	// the following methods are defined in concurrency_control/tictoc.cpp
 	RC				validate_tictoc();
-#elif CC_ALG == SILO
+#elif (CC_ALG == SILO)
 	ts_t 			_cur_tid;
 	RC				validate_silo();
+#elif CC_ALG == HLOCK
+	ts_t 			_cur_tid;
+	RC				validate_hlock();
+	
 #elif CC_ALG == HEKATON
 	RC 				validate_hekaton(RC rc);
 #endif

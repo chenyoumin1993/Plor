@@ -16,6 +16,7 @@
 #include "manager.h"
 #include "wl.h"
 #include "row_olock.h"
+#include "row_hlock.h"
 
 
 extern __thread int *next_coro;
@@ -63,6 +64,8 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_tictoc *) _mm_malloc(sizeof(Row_tictoc), 64);
 #elif CC_ALG == SILO
 	manager = (Row_silo *) _mm_malloc(sizeof(Row_silo), 64);
+#elif CC_ALG == HLOCK
+	manager = (Row_hlock *) _mm_malloc(sizeof(Row_hlock), 64);
 #elif CC_ALG == VLL
     manager = (Row_vll *) mem_allocator.alloc(sizeof(Row_vll), _part_id);
 #endif
@@ -139,6 +142,15 @@ void row_t::set_data(char * data, uint64_t size) {
 void row_t::copy(row_t * src) {
 	set_data(src->get_data(), src->get_tuple_size());
 }
+
+#if CC_ALG == HLOCK
+void 
+row_t::clean_hlock(txn_man *txn) {
+	if (manager->is_locked_rd(txn)) {
+		manager->unlock_rd(txn);
+	}
+}
+#endif
 
 void row_t::free_row() {
 	free(data);
@@ -286,7 +298,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 	// This is a new copy just made.
 	row = txn->cur_row;
 	return rc;
-#elif CC_ALG == TICTOC || CC_ALG == SILO
+#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
 	// like OCC, tictoc also makes a local copy for each read/write
 	row->table = get_table();
 	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
@@ -439,7 +451,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	// This is a new copy just made.
 	row = txn->cur_row;
 	return rc;
-#elif CC_ALG == TICTOC || CC_ALG == SILO
+#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
 	// like OCC, tictoc also makes a local copy for each read/write
 	row->table = get_table();
 	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
@@ -495,7 +507,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	row->free_row();
 	mem_allocator.free(row, sizeof(row_t));
 	return;
-#elif CC_ALG == TICTOC || CC_ALG == SILO
+#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
 	assert (row != NULL);
 	return;
 #elif CC_ALG == HSTORE || CC_ALG == VLL

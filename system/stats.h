@@ -22,10 +22,15 @@ public:
 	uint64_t debug3;
 	uint64_t debug4;
 	uint64_t debug5;
+	uint64_t wound1;
+	uint64_t wound2;
+	uint64_t wound3;
+	uint64_t wound4;
 
 	uint64_t lat_dis[MAX_LAT]; // us
 	uint64_t abort_cnt1;
 	uint64_t abort_cnt2;
+	uint64_t try_cnt;
 	uint64_t abort_dis[MAX_LAT];
 	
 	uint64_t latency;

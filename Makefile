@@ -6,8 +6,8 @@ CFLAGS=-Wall -g -std=c++11
 SRC_DIRS = ./ ./benchmarks/ ./concurrency_control/ ./storage/ ./system/
 INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system
 
-CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3 
-LDFLAGS = -Wall -L. -L./libs -pthread -g -lrt -std=c++0x -O3 -ljemalloc -lprofiler -lboost_system -lboost_coroutine -lcityhash
+CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3
+LDFLAGS = -Wall -L. -L./libs -pthread -g -lrt -std=c++0x -ljemalloc -lprofiler -lboost_system -lboost_coroutine -lcityhash
 LDFLAGS += $(CFLAGS)
 
 CPPS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.cpp))

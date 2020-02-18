@@ -23,7 +23,7 @@ void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	for (int i = 0; i < MAX_ROW_PER_TXN; i++)
 		accesses[i] = NULL;
 	num_accesses_alloc = 0;
-#if CC_ALG == TICTOC || CC_ALG == SILO
+#if CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
 	_pre_abort = (g_params["pre_abort"] == "true");
 	if (g_params["validation_lock"] == "no-wait")
 		_validation_no_wait = true;
@@ -36,7 +36,7 @@ void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	_max_wts = 0;
 	_write_copy_ptr = (g_params["write_copy_form"] == "ptr");
 	_atomic_timestamp = (g_params["atomic_timestamp"] == "true");
-#elif CC_ALG == SILO
+#elif CC_ALG == SILO || CC_ALG == HLOCK
 	_cur_tid = 0;
 #endif
 #if CC_ALG == OLOCK
@@ -97,6 +97,11 @@ void txn_man::cleanup(RC rc) {
 		access_t type = accesses[rid]->type;
 		if (type == WR && rc == Abort)
 			type = XP;
+#if CC_ALG == HLOCK
+		if (type == RD && rc == Abort) {
+			orig_r->clean_hlock(this);
+		}
+#endif
 
 #if (CC_ALG == NO_WAIT || CC_ALG == DL_DETECT) && ISOLATION_LEVEL == REPEATABLE_READ
 		if (type == RD) {
@@ -117,7 +122,7 @@ void txn_man::cleanup(RC rc) {
 		} else {
 			orig_r->return_row(type, this, accesses[rid]->data);
 		}
-#if CC_ALG != TICTOC && CC_ALG != SILO
+#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK
 		accesses[rid]->data = NULL;
 #endif
 	}
@@ -126,7 +131,7 @@ void txn_man::cleanup(RC rc) {
 		for (UInt32 i = 0; i < insert_cnt; i ++) {
 			row_t * row = insert_rows[i];
 			assert(g_part_alloc == false);
-#if CC_ALG != HSTORE && CC_ALG != OCC
+#if CC_ALG != HSTORE && CC_ALG != OCC && CC_ALG != HLOCK
 			mem_allocator.free(row->manager, 0);
 #endif
 			row->free_row();
@@ -160,7 +165,7 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	if (accesses[row_cnt] == NULL) {
 		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
 		accesses[row_cnt] = access;
-#if (CC_ALG == SILO || CC_ALG == TICTOC)
+#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == HLOCK)
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
@@ -176,7 +181,7 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	Locks are acquired here, except OCC (validate in cleanup).
 	*/
 	rc = row->get_row(type, this, accesses[ row_cnt ]->data, yield, coro_id);
-
+	wait_cycles(WAIT_CYCLE);
 
 	if (rc == Abort) {
 		return NULL;
@@ -186,7 +191,7 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 #if CC_ALG == TICTOC
 	accesses[row_cnt]->wts = last_wts;
 	accesses[row_cnt]->rts = last_rts;
-#elif CC_ALG == SILO
+#elif CC_ALG == SILO || CC_ALG == HLOCK
 	accesses[row_cnt]->tid = last_tid;
 #elif CC_ALG == HEKATON
 	accesses[row_cnt]->history_entry = history_entry;
@@ -233,7 +238,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	if (accesses[row_cnt] == NULL) {
 		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
 		accesses[row_cnt] = access;
-#if (CC_ALG == SILO || CC_ALG == TICTOC)
+#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == HLOCK)
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
@@ -250,7 +255,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	Locks are acquired here, except OCC (validate in cleanup).
 	*/
 	rc = row->get_row(type, this, accesses[ row_cnt ]->data);
-
+	wait_cycles(WAIT_CYCLE);
 
 	if (rc == Abort) {
 		return NULL;
@@ -260,7 +265,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 #if CC_ALG == TICTOC
 	accesses[row_cnt]->wts = last_wts;
 	accesses[row_cnt]->rts = last_rts;
-#elif CC_ALG == SILO
+#elif CC_ALG == SILO || CC_ALG == HLOCK
 	accesses[row_cnt]->tid = last_tid;
 #elif CC_ALG == HEKATON
 	accesses[row_cnt]->history_entry = history_entry;
@@ -329,6 +334,11 @@ RC txn_man::finish(RC rc) {
 #elif CC_ALG == SILO
 	if (rc == RCOK)
 		rc = validate_silo();
+	else 
+		cleanup(rc);
+#elif CC_ALG == HLOCK
+	if (rc == RCOK)
+		rc = validate_hlock();
 	else 
 		cleanup(rc);
 #elif CC_ALG == HEKATON

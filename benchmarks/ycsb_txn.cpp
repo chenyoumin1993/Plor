@@ -73,11 +73,16 @@ RC ycsb_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
 //                  }
                 } else {
                     assert(req->rtype == WR);
-//					for (int fid = 0; fid < schema->get_field_cnt(); fid++) {
+					// int size = _wl->the_table->schema->get_tuple_size();
+					// for (int off = 0; off < size; off += 64) {
+					// 	char * data = row->get_data();
+					// 	*(uint64_t *)(&data[off]) = get_thd_id();
+					// }
+					// for (int fid = 0; fid < schema->get_field_cnt(); fid++) {
 						int fid = 0;
 						char * data = row->get_data();
-						*(uint64_t *)(&data[fid * 10]) = 0;
-//					}
+						*(uint64_t *)(&data[fid * 100]) = 0;
+					// }
                 } 
             }
 			iteration ++;

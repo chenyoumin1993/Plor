@@ -18,6 +18,7 @@ public:
 	ts_t timestamp = 0;
 	uint64_t abort_cnt = 0;
 	uint64_t exec_time = 0;
+	uint64_t backoff = 3072;
 };
 
 // All the querise for a particular thread.

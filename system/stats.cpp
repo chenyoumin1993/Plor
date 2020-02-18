@@ -226,14 +226,15 @@ void Stats::print() {
 	if (g_prt_lat_distr)
 		print_lat_distr();
 
-	uint64_t cnt = 0, abort_cnt2 = 0;
+	uint64_t try_cnt = 0, abort_cnt1 = 0, abort_cnt2 = 0;
 	for (uint  i = 0; i < g_thread_cnt; ++i) {
 		if (_stats[i] == NULL) continue;
-		cnt += _stats[i]->abort_cnt1;
+		try_cnt += _stats[i]->try_cnt;
+		abort_cnt1 += _stats[i]->abort_cnt1;
 		abort_cnt2 += _stats[i]->abort_cnt2;
 	}
 
-	printf("%.2f\t%.2f\t", (double)cnt / total_txn_cnt, (double)abort_cnt2 / total_txn_cnt);
+	printf("%.2f\t%.2f\t", (double)abort_cnt1 / try_cnt, (double)abort_cnt2 / total_txn_cnt);
 }
 
 void Stats::print_lat_distr() {
@@ -253,14 +254,22 @@ void Stats::print_lat_distr() {
 	// } 
 	uint64_t total_lat_dis[MAX_LAT];
 	double total_cnt = 0;
+	uint64_t debug4 = 0, debug5 = 0, wound1 = 0, wound2= 0, wound3 = 0, wound4 = 4;
 	for (uint i = 0; i < g_thread_cnt; ++i) {
 		if (_stats[i] == NULL) continue;
+		debug4 += _stats[i]->debug4;
+		debug5 += _stats[i]->debug5;
+		wound1 += _stats[i]->wound1;
+		wound2 += _stats[i]->wound2;
+		wound3 += _stats[i]->wound3;
+		wound4 += _stats[i]->wound4;
 		for (int j = 0; j < MAX_LAT; ++j) {
 			total_lat_dis[j] += _stats[i]->lat_dis[j];
 			total_cnt += (double)_stats[i]->lat_dis[j];
 		}
 	}
-
+	// printf("debug4 = %d, debug5 = %d, wound1 = %d, wound2 = %d, wound3 = %d, wound4 = %d\n", 
+	// debug4, debug5, wound1, wound2, wound3, wound4);
 
 	double tmp_cnt = 0;
 	bool p_50 = false, p_90 = false, p_95 = false, p_99 = false, p_999 = false;

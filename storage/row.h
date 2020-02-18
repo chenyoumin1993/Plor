@@ -34,6 +34,7 @@ class Row_silo;
 class Row_vll;
 class Row_olock;
 class Row_dlock;
+class Row_hlock;
 
 class row_t
 {
@@ -88,12 +89,15 @@ public:
 	void return_row(access_t type, txn_man * txn, row_t * row);
 
   // Mainly used to manage the lock.
-  #if CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT
+  #if (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT)
     Row_lock * manager;
   #elif CC_ALG == OLOCK
 	Row_olock * manager;  
   #elif CC_ALG == DLOCK
 	Row_dlock * manager;
+  #elif CC_ALG == HLOCK
+	Row_hlock * manager;
+	void clean_hlock(txn_man *txn);
   #elif CC_ALG == TIMESTAMP
    	Row_ts * manager;
   #elif CC_ALG == MVCC

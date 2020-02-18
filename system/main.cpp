@@ -21,7 +21,7 @@ void exec(coro_yield_t &yield, int coro_id);
 __thread coro_call_t *coro_arr;
 __thread int *next_coro;
 
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 void * epoch(void *);
 bool finished = false;
 pthread_t e;
@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
 		m_thds[i]->init(i, m_wl);
 	if (WARMUP > 0){
 		// printf("WARMUP start!\n");
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 		pthread_create(&e, NULL, epoch, (void *)0);
 #endif
 		for (uint32_t i = 0; i < CORE_CNT - 1; i++) {
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 			pthread_join(p_thds[i], NULL);
 		// printf("WARMUP finished!\n");
 	}
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 	finished = true;
 	pthread_join(e, NULL);
 #endif
@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
 	
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 	finished = false;
 	pthread_create(&e, NULL, epoch, (void *)0);
 #endif
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 	for (uint32_t i = 0; i < CORE_CNT - 1; i++) 
 		pthread_join(p_thds[i], NULL);
 	// int64_t endtime = get_server_clock();
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 	finished = true;
 	pthread_join(e, NULL);
 #endif
@@ -173,7 +173,7 @@ void exec(coro_yield_t &yield, int coro_id) {
 	m_thds[coro_id]->run(yield, coro_id);
 }
 
-#ifdef USE_EPOCH
+#if PENALTY_POLICY == 2
 void * epoch(void * id) {
 	while (!finished) {
 		usleep(EPOCH_LENGTH);

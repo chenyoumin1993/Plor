@@ -1,52 +1,28 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 64
-#define CC_ALG SILO
-#define ZIPF_THETA 0.99
-#define READ_PERC 0.5
-#define WRITE_PERC .5
-#define USE_SPINLOCK 0
-#define ATOMIC_WORD true
-#define WORKLOAD YCSB
 
-#define CORO_CNT 1
-#define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
-
-#define PENALTY_POLICY 0
-#define EPOCH_LENGTH 1000
-
-#define LONG_TX_ENABLE 1
-#define LONG_TX_PERC 1//0.00125
-#define LONG_TX_EXEC_TIME 0
-
-#define THREAD_CNT (CORO_CNT * CORE_CNT)
-
-#define WAIT_CYCLE 4200
-
-// #define DEBUG_WOUND 1
-
-// 
 /***********************************************/
 // Simulation + Hardware
 /***********************************************/
-#define PART_CNT					1
+#define THREAD_CNT					4
+#define PART_CNT					1 
 // each transaction only accesses 1 virtual partition. But the lock/ts manager and index are not aware of such partitioning. VIRTUAL_PART_CNT describes the request distribution and is only used to generate queries. For HSTORE, VIRTUAL_PART_CNT should be the same as PART_CNT.
 #define VIRTUAL_PART_CNT			1
 #define PAGE_SIZE					4096 
 #define CL_SIZE						64
 // CPU_FREQ is used to get accurate timing info 
-#define CPU_FREQ 					2.460296 	// in GHz/s
+#define CPU_FREQ 					2 	// in GHz/s
 
 // # of transactions to run for warmup
 #define WARMUP						0
 // YCSB or TPCC
+#define WORKLOAD 					YCSB
 // print the transaction latency distribution
-#define PRT_LAT_DISTR					true	
-#define STATS_ENABLE					true
-#define TIME_ENABLE					true
-#define MAX_LAT						100000
+#define PRT_LAT_DISTR				false
+#define STATS_ENABLE				true
+#define TIME_ENABLE					true 
 
-#define MEM_ALLIGN					8
+#define MEM_ALLIGN					8 
 
 // [THREAD_ALLOC]
 #define THREAD_ALLOC				false
@@ -61,8 +37,9 @@
 /***********************************************/
 // Concurrency Control
 /***********************************************/
-// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HEKATON, HSTORE, OCC, VLL, TICTOC, SILO, WOUND_WAIT
+// WAIT_DIE, NO_WAIT, DL_DETECT, TIMESTAMP, MVCC, HEKATON, HSTORE, OCC, VLL, TICTOC, SILO
 // TODO TIMESTAMP does not work at this moment
+#define CC_ALG 						TICTOC
 #define ISOLATION_LEVEL 			SERIALIZABLE
 
 // all transactions acquire tuples according to the primary key order.
@@ -89,7 +66,7 @@
 #define TIMEOUT						1000000 // 1ms
 // [TIMESTAMP]
 #define TS_TWR						false
-#define TS_ALLOC					TS_CAS //TS_CLOCK
+#define TS_ALLOC					TS_CAS
 #define TS_BATCH_ALLOC				false
 #define TS_BATCH_NUM				1
 // [MVCC]
@@ -98,7 +75,7 @@
 //#define HIS_RECYCLE_LEN				10
 //#define MAX_PRE_REQ					1024
 //#define MAX_READ_REQ				1024
-#define MIN_TS_INTVL				5000000 // 5 ms. In nanoseconds
+#define MIN_TS_INTVL				5000000 //5 ms. In nanoseconds
 // [OCC]
 #define MAX_WRITE_SET				10
 #define PER_ROW_VALID				true
@@ -111,14 +88,13 @@
 // [TICTOC, SILO]
 #define VALIDATION_LOCK				"no-wait" // no-wait or waiting
 #define PRE_ABORT					"true"
+#define ATOMIC_WORD					true
 // [HSTORE]
 // when set to true, hstore will not access the global timestamp.
 // This is fine for single partition transactions. 
 #define HSTORE_LOCAL_TS				false
 // [VLL] 
 #define TXN_QUEUE_SIZE_LIMIT		THREAD_CNT
-// [DLOCK]
-#define EX_MODE 0x1314
 
 /***********************************************/
 // Logging
@@ -133,12 +109,15 @@
 // max number of rows touched per transaction
 #define MAX_ROW_PER_TXN				64
 #define QUERY_INTVL 				1UL
-#define MAX_TXN_PER_PART 			100000
+#define MAX_TXN_PER_PART 			100
 #define FIRST_PART_LOCAL 			true
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(1000 * 1000 * 10)
+#define SYNTH_TABLE_SIZE 			(1024 * 40)
+#define ZIPF_THETA 					0.6
+#define READ_PERC 					0.9
+#define WRITE_PERC 					0.1
 #define SCAN_PERC 					0
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
@@ -154,7 +133,7 @@
 // are not modeled.
 #define TPCC_ACCESS_ALL 			false 
 #define WH_UPDATE					true
-#define NUM_WH 						1// THREAD_CNT
+#define NUM_WH 						1
 //
 enum TPCCTxnType {TPCC_ALL, 
 				TPCC_PAYMENT, 
@@ -226,11 +205,6 @@ extern TestCases					g_test_case;
 #define SILO						9
 #define VLL							10
 #define HEKATON 					11
-#define WOUND_WAIT					12
-#define OLOCK						13
-#define DLOCK						14
-#define HLOCK						15
-
 //Isolation Levels 
 #define SERIALIZABLE				1
 #define SNAPSHOT					2
@@ -240,12 +214,5 @@ extern TestCases					g_test_case;
 #define TS_CAS						2
 #define TS_HW						3
 #define TS_CLOCK					4
-
-// __thread static int who_am_i;
-// __thread static int my_ts;
-// __thread static int waiting_for;
-// __thread static int waiting_ts;
-// __thread static int waiting_reader;
-// __thread static int waiting_reader_ts;
 
 #endif
