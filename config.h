@@ -1,8 +1,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 64
-#define CC_ALG SILO
-#define ZIPF_THETA 0.99
+#define CORE_CNT 8
+#define CC_ALG DLOCK
+#define ZIPF_THETA 0.1
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
@@ -12,7 +12,7 @@
 #define CORO_CNT 1
 #define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
 
-#define PENALTY_POLICY 0
+#define PENALTY_POLICY 1
 #define EPOCH_LENGTH 1000
 
 #define LONG_TX_ENABLE 1
@@ -21,7 +21,11 @@
 
 #define THREAD_CNT (CORO_CNT * CORE_CNT)
 
-#define WAIT_CYCLE 4200
+#define WAIT_CYCLE 0
+
+#define BACKOFF_CYCLE 3750
+
+#define VARY_REQ_CNT 0
 
 // #define DEBUG_WOUND 1
 
@@ -138,7 +142,7 @@
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(1000 * 1000 * 10)
+#define SYNTH_TABLE_SIZE 			(80)
 #define SCAN_PERC 					0
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1

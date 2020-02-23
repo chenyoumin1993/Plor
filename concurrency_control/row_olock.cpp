@@ -370,7 +370,7 @@ RC Row_dlock::lock_release_ex(lock_t type, txn_man *txn) {
                     txn_tb[i]->wound = true;
                 } else {
                     // Wait it.
-                    while (bmpRd->isSet(i) && !txn->wound) {
+                    while (bmpRd->isSet(i) && !txn->wound && (txn_tb[i]->get_ts() < txn->get_ts())) {
                         asm volatile ("lfence" ::: "memory");
                     }
                     if (txn->wound) {
@@ -445,13 +445,13 @@ _start:
     uint64_t temp = o.owner;
     txn_man *cur_owner = (txn_man *)temp;
 
-    if (cur_owner == txn && o.wound) {
-        // Someone else wound me, so I need to wait until wound arrive.
-        while (txn->wound == false) {
-            PAUSE
-            asm volatile ("lfence" ::: "memory");
-        }
-    }
+    // if (cur_owner == txn && o.wound) {
+    //     // Someone else wound me, so I need to wait until wound arrive.
+    //     while (txn->wound == false) {
+    //         PAUSE
+    //         asm volatile ("lfence" ::: "memory");
+    //     }
+    // }
 
     // find the oldest and make him the owner.
     txn_man *txn_old = find_oldest(); // return NULL if empty.
@@ -464,6 +464,7 @@ _start:
         // Someone is wounding me!
         goto _start;
     } else if (txn_old != NULL) {
+        // asm volatile ("sfence" ::: "memory");
         txn_old->lock_ready = true;
     }
     return RCOK;

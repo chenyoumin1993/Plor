@@ -25,13 +25,13 @@ do
 	replace 5 "#define ZIPF_THETA $zip" config.h
 	replace 6 "#define READ_PERC $rd" config.h
 	replace 10 "#define WORKLOAD YCSB" config.h
+	#replace 26 "#define BACKOFF_CYCLE $w" config.h
 	replace 24 "#define WAIT_CYCLE $w" config.h
 	wt=`echo 1 - $rd | bc`
 	replace 7 "#define WRITE_PERC $wt" config.h
 	printf "%.2f\t%.2f\t%.2f\t%d\t%s\t%d\t" $rd $wt $zip $t $cc $exec_t
 	make clean &> /dev/null
 	make -j &> /dev/null
-	sleep 2
 	timeout 60 ./rundb
 	printf "\n"
 done

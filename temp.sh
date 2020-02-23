@@ -4,10 +4,10 @@ replace()
 	sed -i "$1s/.*/$2/" $3
 }
 
-CC_AGS=(DLOCK SILO)
+CC_AGS=(WOUND_WAIT DLOCK SILO)
 MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
-ZIPF=(0.8 0.85 0.9 0.99)
-READ=(0.5 0.95)
+ZIPF=(0.99)
+READ=(0.5)
 
 
 echo "No Backoff."
@@ -42,7 +42,7 @@ done
 
 
 echo "Policy 0."
-replace 267 "wait_cycles(cycles_to_wait);" system/thread.cpp
+replace 267 "				wait_cycles(cycles_to_wait);" system/thread.cpp
 replace 15 "#define PENALTY_POLICY 0" config.h
 
 printf "Rd\tWt\tZip\tT\tCC\tTP\tP50\tP90\tP99\tP999\tAbt\n"

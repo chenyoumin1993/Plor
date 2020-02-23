@@ -43,8 +43,8 @@ double ycsb_query::zeta(uint64_t n, double theta) {
 }
 
 uint64_t ycsb_query::zipf(uint64_t n, double theta) {
-	assert(this->the_n == n);
-	assert(theta == g_zipf_theta);
+	// assert(this->the_n == n);
+	// assert(theta == g_zipf_theta);
 	double alpha = 1 / (1 - theta);
 	double zetan = denom;
 	double eta = (1 - pow(2.0 / n, 1 - theta)) / 
@@ -97,7 +97,20 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 
 
 	int rid = 0;
-	for (UInt32 tmp = 0; tmp < g_req_per_query; tmp ++) {	
+#if VARY_REQ_CNT == 0
+	int total_req_cnt = g_req_per_query;
+#else
+	double rnd;
+	drand48_r(&_query_thd->buffer, &rnd);
+	int total_req_cnt;
+	if (rnd < 0.9) {
+		total_req_cnt = 4;
+	} else {
+		total_req_cnt = g_req_per_query;
+	}
+	// total_req_cnt = (int)(rnd * g_req_per_query) + 1;
+#endif
+	for (UInt32 tmp = 0; tmp < total_req_cnt; tmp ++) {	
 		double r;
 		drand48_r(&_query_thd->buffer, &r);
 		ycsb_request * req = &requests[rid];
@@ -111,7 +124,7 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 		}
 
 		// the request will access part_id.
-		uint64_t ith = tmp * part_num / g_req_per_query;
+		uint64_t ith = tmp * part_num / total_req_cnt;
 		uint64_t part_id = 
 			part_to_access[ ith ];
 		uint64_t table_size = g_synth_table_size / g_virtual_part_cnt;
