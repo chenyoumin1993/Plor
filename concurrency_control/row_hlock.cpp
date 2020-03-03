@@ -43,8 +43,12 @@ Row_hlock::access(txn_man * txn, TsType type, row_t * local_row) {
 	// } 
 	// if (txn->wound)
 	// 	return Abort;
+#if INTERACTIVE_MODE == 0
 	if (type != R_REQ)
 		local_row->copy(_row);
+#else
+	local_row->copy(_row);
+#endif
 	txn->last_tid = lockWr->_ts;
 	return RCOK;
 }

@@ -18,6 +18,13 @@
 #include "row_olock.h"
 #include "row_hlock.h"
 
+#include "rpc.h"
+
+#if INTERACTIVE_MODE == 1
+extern Rpc rpc;
+extern __thread int mytid;
+#endif
+
 
 extern __thread int *next_coro;
 extern __thread coro_call_t *coro_arr;
@@ -136,7 +143,11 @@ char * row_t::get_data() { return data; }
 
 void row_t::set_data(char * data, uint64_t size) { 
 	// ASSERT(this->data != data);
+#if INTERACTIVE_MODE == 1
+	rpc.rpcCopy(mytid, this->data, data, size);
+#else
 	memcpy(this->data, data, size);
+#endif
 }
 // copy from the src to this
 void row_t::copy(row_t * src) {
@@ -171,7 +182,12 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 #endif
 
 	if (rc == RCOK) {
+	#if INTERACTIVE_MODE == 0
 		row = this;
+	#else
+		assert(row != NULL);
+		row->copy(this);
+	#endif
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
 		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
@@ -254,7 +270,12 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		}
 		endtime = get_sys_clock();
 		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
+	#if INTERACTIVE_MODE == 0
 		row = this;
+	#else
+		assert(row != NULL);
+		row->copy(this);
+	#endif
 	}
 	return rc;
 #elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == HEKATON 
@@ -474,8 +495,10 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 // (cf. row_ts.cpp)
 void row_t::return_row(access_t type, txn_man * txn, row_t * row) {	
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
+#if INTERACTIVE_MODE == 0
 	assert (row == NULL || row == this || type == XP);
-	if (ROLL_BACK && type == XP) {// recover from previous writes.
+#endif
+	if (ROLL_BACK && type == XP && INTERACTIVE_MODE == 0) {// recover from previous writes.
 		this->copy(row);
 	}
 	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;

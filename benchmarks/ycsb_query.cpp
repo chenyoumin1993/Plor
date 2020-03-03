@@ -98,11 +98,11 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 
 	int rid = 0;
 #if VARY_REQ_CNT == 0
-	int total_req_cnt = g_req_per_query;
+	UInt32 total_req_cnt = g_req_per_query;
 #else
 	double rnd;
 	drand48_r(&_query_thd->buffer, &rnd);
-	int total_req_cnt;
+	UInt32 total_req_cnt;
 	if (rnd < 0.9) {
 		total_req_cnt = 4;
 	} else {

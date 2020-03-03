@@ -4,11 +4,13 @@ replace()
 	sed -i "$1s/.*/$2/" $3
 }
 
-CC_AGS=(WOUND_WAIT DLOCK SILO)
+#CC_AGS=(WOUND_WAIT DLOCK SILO)
+CC_AGS=(NO_WAIT WAIT_DIE)
 MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
 ZIPF=(0.99)
 READ=(0.5)
-WAIT=(1050 2100 4200)
+#WAIT=(0 1050 2100 4200)
+WAIT=(0)
 printf "Rd\tWt\tZip\tT\tCC\tTP\tP50\tP90\tP99\tP999\tAbt\n"
 for w in ${WAIT[@]}
 do

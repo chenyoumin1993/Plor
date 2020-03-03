@@ -122,7 +122,7 @@ void txn_man::cleanup(RC rc) {
 		} else {
 			orig_r->return_row(type, this, accesses[rid]->data);
 		}
-#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK
+#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && INTERACTIVE_MODE == 0
 		accesses[rid]->data = NULL;
 #endif
 	}
@@ -171,6 +171,10 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
 #elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
+#if INTERACTIVE_MODE == 1
+		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
+		access->data->init(MAX_TUPLE_SIZE);
+#endif
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
 #endif
@@ -180,7 +184,9 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	Create a local copy in *data* if necessary.
 	Locks are acquired here, except OCC (validate in cleanup).
 	*/
+	
 	rc = row->get_row(type, this, accesses[ row_cnt ]->data, yield, coro_id);
+
 	wait_cycles(WAIT_CYCLE);
 
 	if (rc == Abort) {
@@ -198,7 +204,7 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
-	if (type == WR) {
+	if (type == WR && INTERACTIVE_MODE == 0) {
 		accesses[row_cnt]->orig_data->table = row->get_table();
 		accesses[row_cnt]->orig_data->copy(row);
 	}
@@ -244,6 +250,10 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
 #elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
+#if INTERACTIVE_MODE == 1
+		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
+		access->data->init(MAX_TUPLE_SIZE);
+#endif
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
 		assert(access->orig_data != NULL);
@@ -254,6 +264,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	Create a local copy in *data* if necessary.
 	Locks are acquired here, except OCC (validate in cleanup).
 	*/
+
 	rc = row->get_row(type, this, accesses[ row_cnt ]->data);
 	wait_cycles(WAIT_CYCLE);
 
@@ -272,7 +283,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 #endif
 
 #if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
-	if (type == WR) {
+	if (type == WR && INTERACTIVE_MODE == 0) {
 		assert(accesses[row_cnt]->orig_data != NULL);
 		accesses[row_cnt]->orig_data->table = row->get_table();
 		accesses[row_cnt]->orig_data->copy(row);

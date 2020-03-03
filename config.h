@@ -1,8 +1,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 8
-#define CC_ALG DLOCK
-#define ZIPF_THETA 0.1
+#define CORE_CNT 32
+#define CC_ALG SILO
+#define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
@@ -25,7 +25,10 @@
 
 #define BACKOFF_CYCLE 3750
 
-#define VARY_REQ_CNT 0
+#define VARY_REQ_CNT 1
+
+#define INTERACTIVE_MODE 1
+#define STORAGE_WORKER_CNT 32
 
 // #define DEBUG_WOUND 1
 
@@ -142,12 +145,12 @@
 #define MAX_TUPLE_SIZE				1024 // in bytes
 // ==== [YCSB] ====
 #define INIT_PARALLELISM			40
-#define SYNTH_TABLE_SIZE 			(80)
+#define SYNTH_TABLE_SIZE 			(1024 * 1024 * 10)
 #define SCAN_PERC 					0
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
 #define PERC_MULTI_PART				1
-#define REQ_PER_QUERY				16
+#define REQ_PER_QUERY				32
 #define FIELD_PER_TUPLE				10
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory

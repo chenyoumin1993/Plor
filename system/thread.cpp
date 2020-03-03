@@ -17,6 +17,7 @@ extern __thread int *next_coro;
 extern __thread coro_call_t *coro_arr;
 char _pad1111[4096];
 txn_man *txn_tb[THREAD_CNT];
+__thread int mytid;
 char _pad2222[4096];
 
 void thread_t::init(uint64_t thd_id, workload * workload) {
@@ -64,6 +65,8 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 	assert (rc == RCOK);
 	glob_manager->set_txn_man(m_txn);
 	txn_tb[_thd_id] = m_txn;
+	mytid = _thd_id;
+	// printf("mytid = %d\n", mytid);
 	base_query * m_query = NULL;
 	uint64_t thd_txn_id = 0;
 	UInt64 txn_cnt = 0;
@@ -109,7 +112,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 					m_query = query_queue->get_next_query( _thd_id );
 			}
 #elif PENALTY_POLICY == 1  // ONLY HAS ONE SLOT
-			int trial = 0;
+			// int trial = 0;
 			if (_abort_buffer_enable) {
 				m_query = NULL;
 				if (_abort_buffer[0].query != NULL) {

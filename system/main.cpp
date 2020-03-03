@@ -14,6 +14,7 @@
 #include "occ.h"
 #include "vll.h"
 #include "coro.h"
+#include "rpc.h"
 
 void * f(void *);
 void exec(coro_yield_t &yield, int coro_id);
@@ -32,6 +33,10 @@ thread_t ** m_thds;
 workload * m_wl;
 thread perf;
 bool start_perf = false;
+
+#if INTERACTIVE_MODE == 1
+Rpc rpc;
+#endif
 
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
@@ -125,6 +130,10 @@ int main(int argc, char* argv[])
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
 	
+#if INTERACTIVE_MODE == 1
+	rpc.start();
+#endif
+
 #if PENALTY_POLICY == 2
 	finished = false;
 	pthread_create(&e, NULL, epoch, (void *)0);

@@ -309,7 +309,7 @@ _start:
 }
 
 RC Row_dlock::lock_get_sh(lock_t type, txn_man *txn) {
-_start:
+// _start:
     Owner o = owner;
     uint64_t temp = o.owner;
     txn_man *cur_owner = (txn_man *)temp;
@@ -346,7 +346,7 @@ RC Row_dlock::lock_release(lock_t type, txn_man *txn) {
 
 RC Row_dlock::lock_release_ex(lock_t type, txn_man *txn) {
     Owner o, o_new;
-    uint32_t total_readers;
+    // uint32_t total_readers;
 
     // If I was wounded, don't need to care about the readers, release the lock directly.
     if (txn->wound) {
@@ -442,8 +442,8 @@ _release:
 _start:
     
     o = o_new = owner;
-    uint64_t temp = o.owner;
-    txn_man *cur_owner = (txn_man *)temp;
+    // uint64_t temp = o.owner;
+    // txn_man *cur_owner = (txn_man *)temp;
 
     // if (cur_owner == txn && o.wound) {
     //     // Someone else wound me, so I need to wait until wound arrive.
