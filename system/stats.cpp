@@ -366,7 +366,7 @@ void Stats::performance(){
 	end_time = get_sys_clock();
 	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 
-	printf("%.2f\t", rate);
+	printf("%.2f, %.2f\t", (double)(end_time - start_time) / 1000000000, rate);
 	old_total_cnt = new_total_cnt;
 	// ProfilerStop();
 	// goto _start;

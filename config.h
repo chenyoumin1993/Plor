@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 32
-#define CC_ALG SILO
+#define CORE_CNT 16
+#define CC_ALG HLOCK
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
@@ -28,7 +28,7 @@
 #define VARY_REQ_CNT 1
 
 #define INTERACTIVE_MODE 1
-#define STORAGE_WORKER_CNT 32
+#define STORAGE_WORKER_CNT 4
 
 // #define DEBUG_WOUND 1
 
@@ -248,11 +248,8 @@ extern TestCases					g_test_case;
 #define TS_HW						3
 #define TS_CLOCK					4
 
-// __thread static int who_am_i;
-// __thread static int my_ts;
-// __thread static int waiting_for;
-// __thread static int waiting_ts;
-// __thread static int waiting_reader;
-// __thread static int waiting_reader_ts;
+
+// Debug info
+#define PRINT_LAT_DEBUG				1
 
 #endif

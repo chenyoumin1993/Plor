@@ -198,6 +198,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		uint64_t endtime;
 		txn->lock_abort = false;
 		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
+		ts_t wait_start = get_sys_clock();
 		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
 #if CC_ALG == WAIT_DIE 
 			continue;
@@ -254,6 +255,12 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 				PAUSE
 #endif
 		}
+
+		ts_t wait_end = get_sys_clock();
+		if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
+			last_waiting_time += wait_end - wait_start; // ns
+		}
+
 		if (txn->lock_ready) {
 			rc = RCOK;
 		}

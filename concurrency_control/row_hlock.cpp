@@ -80,6 +80,8 @@ Row_hlock::lock_wr(txn_man *txn) {
 	}
 	assert(lockWr->_tid != (txn->get_thd_id() + 1) && lockWr->_tid <= THREAD_CNT);
 
+	ts_t wait_start = get_sys_clock();
+	ts_t wait_end;
 	while (!txn->wound) {
 		// Read a snapshot.
 		asm volatile ("lfence" ::: "memory");
@@ -109,6 +111,11 @@ Row_hlock::lock_wr(txn_man *txn) {
 				// asm volatile ("sfence" ::: "memory");
 			}
 		}
+	}
+
+	wait_end = get_sys_clock();
+	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
+		last_waiting_time += wait_end - wait_start; // ns
 	}
 	
 	// txn->waiting = false;

@@ -267,7 +267,15 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				// double r;
 				// drand48_r(&buffer, &r);
 				// uint64_t cycles_to_wait = r * m_query->backoff;
+				ts_t wait_start = get_sys_clock();
 				wait_cycles(cycles_to_wait);
+				ts_t wait_end = get_sys_clock();
+				uint64_t diff = (wait_end - wait_start) / 1000;
+				if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
+					total_backoff_cnt += 1;
+					total_backoff_time += wait_end - wait_start; // ns
+					backoff_time_dis[diff >= 1000 ? 999 : diff] += 1; // us
+				}
 			}
 #else
 			// Put the aborted TX in _epoch_buffer.
@@ -287,6 +295,22 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		// DIS_STATS(get_thd_id(), lat_dis, ((endtime1 - starttime1) / 1000));
 		ts_t endtime = get_sys_clock();
 		uint64_t timespan = endtime - starttime;
+		if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
+			if (rc == RCOK) {
+				total_commit_cnt += 1;
+				total_commit_time += timespan;
+				total_waiting_2_commit_time += last_waiting_time; // ns
+				commit_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
+				waiting_2_commit_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
+			} else {
+				total_abort_cnt += 1;
+				total_abort_time += timespan;
+				total_waiting_2_abort_time += last_waiting_time; // ns
+				abort_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
+				waiting_2_abort_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
+			}
+			last_waiting_time = 0;
+		}
 		INC_STATS(get_thd_id(), run_time, timespan);
 		INC_STATS(get_thd_id(), latency, timespan);
 		// DIS_STATS(get_thd_id(), lat_dis, timespan);
@@ -303,11 +327,11 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		}
 
 		if (rc == FINISH)
-			return rc;
+			goto _end;
 		if (!warmup_finish && txn_cnt >= WARMUP / g_thread_cnt) 
 		{
 			stats.clear( get_thd_id() );
-			return FINISH;
+			goto _end;
 		}
 
 		// if (warmup_finish && txn_cnt >= MAX_TXN_PER_PART) {
@@ -316,12 +340,20 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		// 		assert( _wl->sim_done);
 	    // }
 	    if (_wl->sim_done) { 
-   		    return FINISH;
+   		    goto _end;
    		}
 		if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT))
 			yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 	}
-	assert(false);
+_end:
+	// assert(false);
+	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
+		printf("\nCOMMIT, CNT=%lld, TOTAL=%lld, WAIT=%lld\n", 
+		(long long)total_commit_cnt, (long long)total_commit_time / 1000, (long long)total_waiting_2_commit_time / 1000);
+		printf("ABORT, CNT=%lld, TOTAL=%lld, WAIT=%lld, BACKOFF=%lld\n", 
+		(long long)total_abort_cnt, (long long)total_abort_time / 1000, (long long)total_waiting_2_abort_time / 1000, (long long)total_backoff_time / 1000);
+	}
+	return rc;
 }
 
 

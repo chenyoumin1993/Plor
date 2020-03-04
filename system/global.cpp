@@ -74,3 +74,21 @@ UInt32 g_cust_per_dist = 2000;
 UInt32 g_max_items = 100000;
 UInt32 g_cust_per_dist = 3000;
 #endif
+
+#if PRINT_LAT_DEBUG == 1
+// The 0th thread record this.
+uint64_t total_commit_cnt = 0;
+uint64_t total_abort_cnt = 0;
+uint64_t total_backoff_cnt = 0;
+uint64_t total_abort_time = 0;
+uint64_t total_commit_time = 0;
+uint64_t total_backoff_time = 0;
+uint64_t total_waiting_2_commit_time = 0;
+uint64_t total_waiting_2_abort_time = 0;
+uint64_t last_waiting_time = 0;
+uint64_t abort_time_dis[1000];
+uint64_t commit_time_dis[1000];
+uint64_t backoff_time_dis[1000];
+uint64_t waiting_2_commit_time_dis[1000];
+uint64_t waiting_2_abort_time_dis[1000];
+#endif
