@@ -25,7 +25,7 @@
 
 #define BACKOFF_CYCLE 3750
 
-#define VARY_REQ_CNT 1
+#define VARY_REQ_CNT 0
 
 #define INTERACTIVE_MODE 0
 #define STORAGE_WORKER_CNT 4
@@ -150,7 +150,7 @@
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
 #define PERC_MULTI_PART				1
-#define REQ_PER_QUERY				32
+#define REQ_PER_QUERY				16
 #define FIELD_PER_TUPLE				10
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
