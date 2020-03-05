@@ -234,7 +234,8 @@ void Stats::print() {
 		abort_cnt2 += _stats[i]->abort_cnt2;
 	}
 
-	printf("%.2f\t%.2f\t", (double)abort_cnt1 / try_cnt, (double)abort_cnt2 / total_txn_cnt);
+	// printf("%.2f\t%.2f\t", (double)abort_cnt1 / try_cnt, (double)abort_cnt2 / total_txn_cnt);
+	printf("%.2f\t", (double)abort_cnt1 / try_cnt);
 }
 
 void Stats::print_lat_distr() {
@@ -279,14 +280,14 @@ void Stats::print_lat_distr() {
 			printf ("%d\t", i);
 			p_50 = true;
 		}
-		if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
-			printf ("%d\t", i);
-			p_90 = true;
-		}
-		if (tmp_cnt / total_cnt > 0.95 && p_95 == false) {
-			printf ("%d\t", i);
-			p_95 = true;
-		}
+		// if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
+		// 	printf ("%d\t", i);
+		// 	p_90 = true;
+		// }
+		// if (tmp_cnt / total_cnt > 0.95 && p_95 == false) {
+		// 	printf ("%d\t", i);
+		// 	p_95 = true;
+		// }
 		if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
 			printf ("%d\t", i);
 			p_99 = true;
@@ -319,14 +320,14 @@ void Stats::print_lat_distr() {
 			printf ("%d\t", i);
 			p_50 = true;
 		}
-		if (abt_cnt / total_abt > 0.9 && p_90 == false) {
-			printf ("%d\t", i);
-			p_90 = true;
-		}
-		if (abt_cnt / total_abt > 0.95 && p_95 == false) {
-			printf ("%d\t", i);
-			p_95 = true;
-		}
+		// if (abt_cnt / total_abt > 0.9 && p_90 == false) {
+		// 	printf ("%d\t", i);
+		// 	p_90 = true;
+		// }
+		// if (abt_cnt / total_abt > 0.95 && p_95 == false) {
+		// 	printf ("%d\t", i);
+		// 	p_95 = true;
+		// }
 		if (abt_cnt / total_abt > 0.99 && p_99 == false) {
 			printf ("%d\t", i);
 			p_99 = true;
@@ -366,7 +367,7 @@ void Stats::performance(){
 	end_time = get_sys_clock();
 	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 
-	printf("%.2f, %.2f\t", (double)(end_time - start_time) / 1000000000, rate);
+	printf("%.2f\t", rate);
 	old_total_cnt = new_total_cnt;
 	// ProfilerStop();
 	// goto _start;

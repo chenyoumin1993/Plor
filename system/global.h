@@ -113,7 +113,7 @@ extern char * output_file;
 extern UInt32 g_max_items;
 extern UInt32 g_cust_per_dist;
 
-#if PRINT_LAT_DEBUG == 1
+// #if PRINT_LAT_DEBUG == 1
 // The 0th thread record this.
 extern uint64_t total_commit_cnt;
 extern uint64_t total_abort_cnt;
@@ -124,13 +124,19 @@ extern uint64_t total_commit_time;
 extern uint64_t total_backoff_time;
 extern uint64_t total_waiting_2_commit_time;
 extern uint64_t total_waiting_2_abort_time;
+extern uint64_t total_try_exec_2_commit_time;
+extern uint64_t total_try_exec_2_abort_time;
+extern uint64_t total_try_commit_2_commit_time;
+extern uint64_t total_try_commit_2_abort_time;
 extern uint64_t last_waiting_time;
+extern uint64_t last_try_exec_time;
+extern uint64_t last_try_commit_time;
 extern uint64_t abort_time_dis[1000];
 extern uint64_t commit_time_dis[1000];
 extern uint64_t backoff_time_dis[1000];
 extern uint64_t waiting_2_commit_time_dis[1000];
 extern uint64_t waiting_2_abort_time_dis[1000];
-#endif
+// #endif
 
 enum RC { RCOK, Commit, Abort, WAIT, ERROR, FINISH};
 

@@ -34,6 +34,10 @@ RC ycsb_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
 	itemid_t * m_item = NULL;
   	row_cnt = 0;
 
+	ts_t starttime, endtime;
+
+	starttime = get_sys_clock();
+
 	for (uint32_t rid = 0; rid < m_query->request_cnt; rid ++) {
 		ycsb_request * req = &m_query->requests[rid];
 		int part_id = wl->key_to_part( req->key );
@@ -97,7 +101,13 @@ RC ycsb_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
 #endif
 	rc = RCOK;
 final:
-	// Execute the loose ends (validation in OCC, etc.).
+	endtime = get_sys_clock();
+	if (PRINT_LAT_DEBUG && get_thd_id() == 0)
+		last_try_exec_time = endtime - starttime;
+	// Execute the loose ends (validation in OCC, etc.)
 	rc = finish(rc);
+	starttime = get_sys_clock();
+	if (PRINT_LAT_DEBUG && get_thd_id() == 0)
+		last_try_commit_time = starttime - endtime;
 	return rc;
 }

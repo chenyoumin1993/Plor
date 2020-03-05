@@ -82,6 +82,7 @@ Row_hlock::lock_wr(txn_man *txn) {
 
 	ts_t wait_start = get_sys_clock();
 	ts_t wait_end;
+	bool tag = false;
 	while (!txn->wound) {
 		// Read a snapshot.
 		asm volatile ("lfence" ::: "memory");
@@ -92,6 +93,7 @@ Row_hlock::lock_wr(txn_man *txn) {
 			l_new.wound = 0;
 			if (__sync_bool_compare_and_swap(&lockWr->l_wr, l_old.l_wr, l_new.l_wr)) {
 				// become the new owner.
+				tag = true;
 				goto _success;
 			}
 		} else {
@@ -112,6 +114,7 @@ Row_hlock::lock_wr(txn_man *txn) {
 			}
 		}
 	}
+_success:
 
 	wait_end = get_sys_clock();
 	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
@@ -119,13 +122,12 @@ Row_hlock::lock_wr(txn_man *txn) {
 	}
 	
 	// txn->waiting = false;
-	if (txn->wound) {
+	if (txn->wound && !tag) {
 		// Lock is not acquired.
 		// INC_STATS(txn->get_thd_id(), wound2, 1);
 		return 2;
 	}
 
-_success:
 	// txn->lock_holding += 1;
 	owner_ts = txn->get_ts();
 

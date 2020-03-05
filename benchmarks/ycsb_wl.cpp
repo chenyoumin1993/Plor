@@ -108,7 +108,7 @@ void ycsb_wl::init_table_parallel() {
 void * ycsb_wl::init_table_slice() {
 	UInt32 tid = ATOM_FETCH_ADD(next_tid, 1);
 	// set cpu affinity
-	// set_affinity(tid);
+	set_affinity(tid);
 
 	mem_allocator.register_thread(tid);
 	RC rc;

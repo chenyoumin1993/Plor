@@ -25,7 +25,7 @@ bool Rpc::rpcCopy(int core_id, void *des, void *src, uint64_t size) {
 
 void Rpc::worker(int id) {
     // printf("id = %d\n", id);
-    set_affinity(1);
+    // set_affinity(1);
     int scan_num = THREAD_CNT / thd_num;
     uint64_t cnt = 0;
     // printf("start = %d, end = %d\n", id * scan_num, (id + 1) * scan_num);

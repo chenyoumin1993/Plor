@@ -300,16 +300,22 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				total_commit_cnt += 1;
 				total_commit_time += timespan;
 				total_waiting_2_commit_time += last_waiting_time; // ns
+				total_try_exec_2_commit_time += last_try_exec_time;
+				total_try_commit_2_commit_time += last_try_commit_time;
 				commit_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
 				waiting_2_commit_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
 			} else {
 				total_abort_cnt += 1;
 				total_abort_time += timespan;
 				total_waiting_2_abort_time += last_waiting_time; // ns
+				total_try_exec_2_abort_time += last_try_exec_time;
+				total_try_commit_2_abort_time += last_try_commit_time;
 				abort_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
 				waiting_2_abort_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
 			}
 			last_waiting_time = 0;
+			last_try_exec_time = 0;
+			last_try_commit_time = 0;
 		}
 		INC_STATS(get_thd_id(), run_time, timespan);
 		INC_STATS(get_thd_id(), latency, timespan);
@@ -348,10 +354,17 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 _end:
 	// assert(false);
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
-		printf("\nCOMMIT, CNT=%lld, TOTAL=%lld, WAIT=%lld\n", 
-		(long long)total_commit_cnt, (long long)total_commit_time / 1000, (long long)total_waiting_2_commit_time / 1000);
-		printf("ABORT, CNT=%lld, TOTAL=%lld, WAIT=%lld, BACKOFF=%lld\n", 
-		(long long)total_abort_cnt, (long long)total_abort_time / 1000, (long long)total_waiting_2_abort_time / 1000, (long long)total_backoff_time / 1000);
+		printf("COMMIT\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		(long long)total_commit_cnt, (long long)total_commit_time / 1000, 
+		(long long)total_waiting_2_commit_time / 1000, 
+		(long long)total_try_exec_2_commit_time / 1000, 
+		(long long)total_try_commit_2_commit_time / 1000);
+		printf("ABORT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		(long long)total_abort_cnt, (long long)total_abort_time / 1000, 
+		(long long)total_waiting_2_abort_time / 1000, 
+		(long long)total_backoff_time / 1000, 
+		(long long)total_try_exec_2_abort_time / 1000, 
+		(long long)total_try_commit_2_abort_time / 1000);
 	}
 	return rc;
 }

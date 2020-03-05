@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 16
-#define CC_ALG HLOCK
+#define CORE_CNT 48
+#define CC_ALG SILO
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
@@ -27,7 +27,7 @@
 
 #define VARY_REQ_CNT 1
 
-#define INTERACTIVE_MODE 1
+#define INTERACTIVE_MODE 0
 #define STORAGE_WORKER_CNT 4
 
 // #define DEBUG_WOUND 1

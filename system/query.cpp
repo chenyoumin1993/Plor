@@ -60,7 +60,7 @@ Query_queue::threadInitQuery(void * This) {
 			break;
 		
 		// set cpu affinity
-		// set_affinity(tid);
+		set_affinity(tid);
 
 		query_queue->init_per_thread(tid);
 	}

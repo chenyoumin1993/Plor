@@ -225,7 +225,7 @@ private:
 };
 
 inline void set_affinity(uint64_t thd_id) {
-	return;
+	// return;
 	/*
 	// TOOD. the following mapping only works for swarm
 	// which has 4-socket, 10 physical core per socket, 
@@ -234,14 +234,7 @@ inline void set_affinity(uint64_t thd_id) {
 	uint64_t processor_id = a / 10 + (a % 10) * 4;
 	processor_id += (thd_id / 40) * 40;
 	 */
-	if (thd_id == 0) {
-		thd_id = 48;
-		// printf("0 bind to %d\n", thd_id);
-	}
-	if (thd_id == 1) {
-		thd_id = 49;
-		// printf("1 bind to %d\n", thd_id);
-	}
+	thd_id += 16;
 	cpu_set_t  mask;
 	CPU_ZERO(&mask);
 	CPU_SET(thd_id, &mask);
