@@ -273,7 +273,7 @@ void Stats::print_lat_distr() {
 	// debug4, debug5, wound1, wound2, wound3, wound4);
 
 	double tmp_cnt = 0;
-	bool p_50 = false, p_90 = false, p_95 = false, p_99 = false, p_999 = false;
+	bool p_50 = false, /*p_90 = false, p_95 = false,*/ p_99 = false, p_999 = false, p_max = false;
 	for (int i = 0; i < MAX_LAT; ++i) {
 		tmp_cnt += (double)total_lat_dis[i];
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
@@ -296,6 +296,10 @@ void Stats::print_lat_distr() {
 			printf ("%d\t", i);
 			p_999 = true;
 		} 
+		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
+			printf ("%d\t", i);
+			p_max = true;
+		}
 	}
 	// printf("|\t");
 	uint64_t total_abt_dis[MAX_LAT];
@@ -310,10 +314,11 @@ void Stats::print_lat_distr() {
 
 	double abt_cnt = 0;
 	p_50 = false;
-	p_90 = false;
-	p_95 = false;
+	// p_90 = false;
+	// p_95 = false;
 	p_99 = false;
 	p_999 = false;
+	p_max = false;
 	for (int i = 0; i < MAX_LAT; ++i) {
 		abt_cnt += (double)total_abt_dis[i];
 		if (abt_cnt / total_abt > 0.5 && p_50 == false) {
@@ -335,6 +340,10 @@ void Stats::print_lat_distr() {
 		if (abt_cnt / total_abt > 0.999 && p_999 == false) {
 			printf ("%d\t", i);
 			p_999 = true;
+		} 
+		if (abt_cnt / total_abt >= 0.9999 && p_max == false) {
+			printf ("%d\t", i);
+			p_max = true;
 		} 
 	}
 

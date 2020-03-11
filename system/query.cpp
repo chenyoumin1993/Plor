@@ -1,4 +1,6 @@
 #include <sched.h>
+#include <atomic>
+
 #include "query.h"
 #include "mem_alloc.h"
 #include "wl.h"
@@ -12,11 +14,40 @@
 /*************************************************/
 int Query_queue::_next_tid;
 
+#if VALVE_ENABLED == 1
+uint8_t sig_new_req[THREAD_CNT][1];
+
+extern workload * m_wl;
+
+void valve_f(int id) {
+	// set_affinity(id + THREAD_CNT);
+	double nap = (double)1000000000 / ((double)VALVE_TP / VALVE_CNT); // ns
+	assert((THREAD_CNT % VALVE_CNT) == 0);
+	int s_idx = id * (THREAD_CNT / VALVE_CNT);
+	int e_idx = (id + 1) * (THREAD_CNT / VALVE_CNT);
+
+	int i = s_idx;
+	while (!m_wl->sim_done) {
+		asm volatile ("lfence" ::: "memory");
+		while (sig_new_req[i][0] == 1 && !m_wl->sim_done) {
+			i = (i == (e_idx - 1)) ? s_idx : (i + 1);
+		}
+		__sync_fetch_and_add(&sig_new_req[i][0], 1);
+		// nano_sleep(nap);
+	}
+}
+#endif
+
 void 
 Query_queue::init(workload * h_wl) {
 	all_queries = new Query_thd * [g_thread_cnt];
 	_wl = h_wl;
 	_next_tid = 0;
+
+#if VALVE_ENABLED == 1
+	for (int i = 0; i < THREAD_CNT; ++i)
+		sig_new_req[i][0] = true;
+#endif
 	
 
 #if WORKLOAD == YCSB	
@@ -43,7 +74,15 @@ Query_queue::init_per_thread(int thread_id) {
 }
 
 base_query * 
-Query_queue::get_next_query(uint64_t thd_id) { 	
+Query_queue::get_next_query(uint64_t thd_id) {
+#if VALVE_ENABLED == 1
+	while (!sig_new_req[thd_id][0] && !m_wl->sim_done) {
+		PAUSE
+		asm volatile ("lfence" ::: "memory");
+	}
+	__sync_fetch_and_add(&sig_new_req[thd_id][0], -1);
+
+#endif
 	base_query * query = all_queries[thd_id]->get_next_query();
 	query->abort_cnt = 0;
 	return query;

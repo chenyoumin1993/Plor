@@ -38,6 +38,10 @@ bool start_perf = false;
 Rpc rpc;
 #endif
 
+#if VALVE_ENABLED == 1
+std::thread valves[VALVE_CNT];
+#endif
+
 // defined in parser.cpp
 void parser(int argc, char * argv[]);
 
@@ -102,6 +106,12 @@ int main(int argc, char* argv[])
 #endif
 	for (uint32_t i = 0; i < thd_cnt; i++) 
 		m_thds[i]->init(i, m_wl);
+	
+#if VALVE_ENABLED == 1
+	for (int i = 0; i < VALVE_CNT; ++i)
+		valves[i] = std::thread(valve_f, i);
+#endif
+
 	if (WARMUP > 0){
 		// printf("WARMUP start!\n");
 #if PENALTY_POLICY == 2
@@ -120,6 +130,7 @@ int main(int argc, char* argv[])
 	finished = true;
 	pthread_join(e, NULL);
 #endif
+
 	warmup_finish = true;
 	pthread_barrier_init( &warmup_bar, NULL, CORE_CNT );
 #ifndef NOGRAPHITE
@@ -152,6 +163,13 @@ int main(int argc, char* argv[])
 	pthread_join(e, NULL);
 #endif
 	perf.join();
+
+
+#if VALVE_ENABLED == 1
+	for (int i = 0; i < VALVE_CNT; ++i)
+		valves[i].join();
+#endif
+
 	if (WORKLOAD != TEST) {
 		// printf("PASS! SimTime = %ld\n", endtime - starttime);
 		if (STATS_ENABLE)

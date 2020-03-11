@@ -213,6 +213,18 @@ inline void wait_cycles(uint64_t cycles) {
 	}
 }
 
+inline void nano_sleep(int ns) {
+	struct timespec T1, T2;
+	double diff = 0;
+	clock_gettime(CLOCK_MONOTONIC, &T1);
+	while (diff < ns) {
+		clock_gettime(CLOCK_MONOTONIC, &T2);
+		diff = (T2.tv_sec - T1.tv_sec) * 1000000000 + T2.tv_nsec - T1.tv_nsec;
+	}
+}
+
+void valve_f(int id);
+
 /************************************************/
 // constants
 /************************************************/

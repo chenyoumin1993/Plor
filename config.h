@@ -1,8 +1,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 48
+#define CORE_CNT 32
 #define CC_ALG SILO
-#define ZIPF_THETA 0.99
+#define ZIPF_THETA 0.01
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
@@ -29,6 +29,11 @@
 
 #define INTERACTIVE_MODE 0
 #define STORAGE_WORKER_CNT 4
+
+#define VALVE_ENABLED 0
+#define VALVE_CNT 1 // equal to the number of sockets.
+// How fast to issue requests.
+#define VALVE_TP 10000000
 
 // #define DEBUG_WOUND 1
 

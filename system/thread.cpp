@@ -289,6 +289,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			if ((m_query->stop_time - m_query->start_time) / 1000 > 0) {
 				DIS_STATS(get_thd_id(), abort_dis, m_query->abort_cnt);
 			}
+			
 			if (m_query->abort_cnt > 0)
 				stats._stats[get_thd_id()]->abort_cnt2 += 1;
 		}
