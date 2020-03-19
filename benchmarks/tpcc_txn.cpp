@@ -54,7 +54,7 @@ RC tpcc_txn_man::run_payment(tpcc_query * query) {
 	// TODO for variable length variable (string). Should store the size of 
 	// the variable.
 	key = query->w_id;
-	INDEX * index = _wl->i_warehouse; 
+	INDEX * index = _wl->i_warehouse;
 	item = index_read(index, key, wh_to_part(w_id));
 	assert(item != NULL);
 	row_t * r_wh = ((row_t *)item->location);

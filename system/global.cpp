@@ -97,4 +97,5 @@ uint64_t commit_time_dis[1000];
 uint64_t backoff_time_dis[1000];
 uint64_t waiting_2_commit_time_dis[1000];
 uint64_t waiting_2_abort_time_dis[1000];
+
 // #endif

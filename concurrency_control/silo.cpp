@@ -1,6 +1,7 @@
 #include "txn.h"
 #include "row.h"
 #include "row_silo.h"
+#include "log.h"
 
 #if CC_ALG == SILO
 
@@ -141,6 +142,15 @@ final:
 		asm volatile ("sfence" ::: "memory");
 		cleanup(rc);
 	} else {
+		// Log first.
+	#if PERSISTENT_LOG == 1
+		log->log_tx_meta(get_txn_id(), wr_cnt);
+		for (int i = 0; i < wr_cnt; i++) {
+			log->log_content(accesses[ write_set[i] ]->orig_row->get_primary_key(), 
+				accesses[ write_set[i] ]->orig_row->get_data(), 
+				accesses[ write_set[i] ]->orig_row->get_tuple_size());
+		}
+	#endif
 		for (int i = 0; i < wr_cnt; i++) {
 			Access * access = accesses[ write_set[i] ];
 			access->orig_row->manager->write( 

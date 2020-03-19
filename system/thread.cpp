@@ -13,6 +13,19 @@
 #include "mem_alloc.h"
 #include "test.h"
 
+#if INTERACTIVE_MODE == 1
+#include "rpc.h"
+thread_local erpc::Rpc<erpc::CTransport> *rpc;
+erpc::Nexus *nexus;
+thread_local erpc::MsgBuffer req[N_REPLICAS];
+thread_local erpc::MsgBuffer resp[N_REPLICAS];
+thread_local int session_num[N_REPLICAS];
+thread_local int outstanding_msg_cnt = 0;
+bool is_storage_server = false;
+
+void sm_handler(int, erpc::SmEventType, erpc::SmErrType, void *) {}
+#endif
+
 extern __thread int *next_coro;
 extern __thread coro_call_t *coro_arr;
 char _pad1111[4096];
@@ -45,6 +58,24 @@ void thread_t::set_cur_cid(uint64_t cid) {_cur_cid = cid; }
 int64_t starttime1, endtime1;
 
 RC thread_t::run(coro_yield_t &yield, int coro_id) {
+#if INTERACTIVE_MODE == 1
+	if (!is_storage_server) {
+		rpc = new erpc::Rpc<erpc::CTransport>(nexus, nullptr, _thd_id, sm_handler);
+
+		int s_replicas = sizeof(replicanames) / sizeof(replicanames[0]);
+
+		// Connect to the servers.
+		for (int i = 0; i < s_replicas; ++i) {
+			std::string server_uri = replicanames[i] + ":" + std::to_string(kUDPPortBase);
+			session_num[i] = rpc->create_session(server_uri, _thd_id);
+			// std::cout << server_uri << " : " << std::to_string(_thd_id) << std::endl;
+			while (!rpc->is_connected(session_num[i])) rpc->run_event_loop_once();
+			// Reserve message buffers.
+			req[i] = rpc->alloc_msg_buffer_or_die(sizeof(WriteRowRequest));
+			resp[i] = rpc->alloc_msg_buffer_or_die(sizeof(WriteRowRequest));
+		}
+	}
+#endif
 #if !NOGRAPHITE
 	_thd_id = CarbonGetTileId();
 #endif
@@ -367,6 +398,10 @@ _end:
 		(long long)total_try_exec_2_abort_time / 1000, 
 		(long long)total_try_commit_2_abort_time / 1000);
 	}
+#if INTERACTIVE_MODE == 1
+	delete rpc;
+#endif
+	// delete nexus;
 	return rc;
 }
 

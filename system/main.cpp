@@ -1,6 +1,7 @@
 #include <thread>
 #include <execinfo.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "global.h"
 #include "ycsb.h"
@@ -14,7 +15,6 @@
 #include "occ.h"
 #include "vll.h"
 #include "coro.h"
-#include "rpc.h"
 
 void * f(void *);
 void exec(coro_yield_t &yield, int coro_id);
@@ -35,7 +35,14 @@ thread perf;
 bool start_perf = false;
 
 #if INTERACTIVE_MODE == 1
-Rpc rpc;
+#include "rpc.h"
+void read_handler(erpc::ReqHandle *req_handle, void *);
+void write_handler(erpc::ReqHandle *req_handle, void *);
+void storage_service(int id, int replica_cnt);
+extern thread_local erpc::Rpc<erpc::CTransport> *rpc;
+extern erpc::Nexus *nexus;
+extern bool is_storage_server;
+int replica_cnt = 0;
 #endif
 
 #if VALVE_ENABLED == 1
@@ -62,6 +69,29 @@ int main(int argc, char* argv[])
 {
 	parser(argc, argv);
 	signal(SIGSEGV, handler);
+
+#if INTERACTIVE_MODE == 1
+	int s_replicas = sizeof(replicas) / sizeof(replicas[0]);
+	char hostname[32];
+	gethostname(hostname, 32);
+	int i;
+	for (i = 0; i < s_replicas; ++i)
+		if (strcmp(hostname, replicas[i]) == 0)
+			break;
+	if (i < s_replicas) {
+		// storage services.
+		is_storage_server = true;
+		std::string server_uri = replicanames[i] + ":" + std::to_string(kUDPPortBase);
+		nexus = new erpc::Nexus(server_uri, 0, 0);
+		nexus->register_req_func(kReadType, read_handler);
+		nexus->register_req_func(kWriteType, write_handler);
+	} else {
+		// TX Manager.
+		std::string client_uri = clientname + ":" + std::to_string(kUDPPortBase);
+		nexus = new erpc::Nexus(client_uri, 0, 0);
+	}
+#endif
+
 	mem_allocator.init(g_part_cnt, MEM_SIZE / g_part_cnt); 
 	stats.init();
 	glob_manager = (Manager *) _mm_malloc(sizeof(Manager), 64);
@@ -140,10 +170,6 @@ int main(int argc, char* argv[])
 
 	// spawn and run txns again.
 	// int64_t starttime = get_server_clock();
-	
-#if INTERACTIVE_MODE == 1
-	rpc.start();
-#endif
 
 #if PENALTY_POLICY == 2
 	finished = false;
@@ -164,7 +190,6 @@ int main(int argc, char* argv[])
 #endif
 	perf.join();
 
-
 #if VALVE_ENABLED == 1
 	for (int i = 0; i < VALVE_CNT; ++i)
 		valves[i].join();
@@ -177,6 +202,10 @@ int main(int argc, char* argv[])
 	} else {
 		((TestWorkload *)m_wl)->summarize();
 	}
+
+#if INTERACTIVE_MODE == 1
+	delete nexus;
+#endif
 	return 0;
 }
 
@@ -184,6 +213,13 @@ void * f(void * id) {
 	uint64_t tid = (uint64_t)id;
 	coro_arr = new coro_call_t[CORO_CNT];
 	next_coro = new int[CORO_CNT];
+
+#if INTERACTIVE_MODE == 1
+	if (is_storage_server) {
+		storage_service(tid, replica_cnt);
+		return NULL;
+	}
+#endif
 
 	for (int i = 0; i < CORO_CNT - 1; i++) {
 		next_coro[i] = i + 1;
@@ -199,6 +235,7 @@ void * f(void * id) {
 }
 
 void exec(coro_yield_t &yield, int coro_id) {
+	// First, just whether I'm a storage server, only valid in interactive mode.
 	m_thds[coro_id]->run(yield, coro_id);
 }
 
@@ -208,5 +245,45 @@ void * epoch(void * id) {
 		usleep(EPOCH_LENGTH);
 		epoch_cnt += 1;
 	}
+}
+#endif
+
+#if INTERACTIVE_MODE == 1
+void read_handler(erpc::ReqHandle *req_handle, void *) {
+	auto req = req_handle->get_req_msgbuf();
+	auto &resp = req_handle->pre_resp_msgbuf;
+	// Process the requests.
+	ReadRowRequest *r = reinterpret_cast<ReadRowRequest *>(req->buf);
+	// printf("read request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
+	rpc->resize_msg_buffer(&resp, MAX_TUPLE_SIZE);
+	int tuple_size = m_wl->read_row_data(r->index_cnt, r->primary_key, reinterpret_cast<void *>(resp.buf));
+
+	// Send response message.
+	rpc->resize_msg_buffer(&resp, tuple_size);
+	// sprintf(reinterpret_cast<char *>(resp.buf), "hello");
+	rpc->enqueue_response(req_handle, &resp);
+}
+
+void write_handler(erpc::ReqHandle *req_handle, void *) {
+	auto req = req_handle->get_req_msgbuf();
+	auto &resp = req_handle->pre_resp_msgbuf;
+	
+	// Process the requests.
+	WriteRowRequest *r = reinterpret_cast<WriteRowRequest *>(req->buf);
+	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
+	m_wl->write_row_data(r->index_cnt, r->primary_key, r->size, reinterpret_cast<void *>(r->buf));
+
+	// Send response message.
+	rpc->resize_msg_buffer(&resp, 0);
+	rpc->enqueue_response(req_handle, &resp);
+}
+
+void storage_service(int id, int replica_cnt) {
+	set_affinity(id);
+	// printf("erpc deamon [%d] started.\n", id);
+	rpc = new erpc::Rpc<erpc::CTransport>(nexus, nullptr, id, nullptr);
+	rpc->run_event_loop(1000000000);
+	printf("...\n");
+	delete rpc;
 }
 #endif

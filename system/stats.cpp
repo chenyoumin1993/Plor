@@ -11,6 +11,10 @@ extern workload *m_wl;
 extern thread perf;
 extern bool start_perf;
 
+#if INTERACTIVE_MODE == 1
+extern bool is_storage_server;
+#endif
+
 void Stats_thd::init(uint64_t thd_id) {
 	clear();
 	all_debug1 = (uint64_t *)
@@ -352,6 +356,10 @@ void Stats::print_lat_distr() {
 
 
 void Stats::performance(){
+#if INTERACTIVE_MODE == 1
+	if (is_storage_server)
+		return;
+#endif
 	while (!start_perf) usleep(10);
 	// printf(".......%p\n", &(m_wl->sim_done));
 	sleep(1);

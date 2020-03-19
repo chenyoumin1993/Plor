@@ -69,7 +69,11 @@ Row_silo::validate(ts_t tid, bool in_write_set) {
 
 void
 Row_silo::write(row_t * data, uint64_t tid) {
+#if INTERACTIVE_MODE == 1
+	_row->remote_write(data);
+#else
 	_row->copy(data);
+#endif
 #if ATOMIC_WORD
 	uint64_t v = _tid_word;
 	M_ASSERT(tid > (v & (~LOCK_BIT)) && (v & LOCK_BIT), "tid=%ld, v & LOCK_BIT=%ld, v & (~LOCK_BIT)=%ld\n", tid, (v & LOCK_BIT), (v & (~LOCK_BIT)));

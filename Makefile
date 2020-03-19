@@ -4,10 +4,10 @@ CFLAGS=-Wall -g -std=c++11
 .SUFFIXES: .o .cpp .h
 
 SRC_DIRS = ./ ./benchmarks/ ./concurrency_control/ ./storage/ ./system/
-INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system
+INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system -I../eRPC/src 
 
-CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3
-LDFLAGS = -Wall -L. -L./libs -pthread -g -lrt -std=c++0x -ljemalloc -lprofiler -lboost_system -lboost_coroutine -lcityhash
+CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3 -DERPC_INFINIBAND=true
+LDFLAGS = -Wall -L. -L./libs -L../eRPC/build -pthread -g -lrt -lnuma -ljemalloc -lprofiler -lboost_system -lboost_coroutine -lcityhash -ldl -lerpc -libverbs -lm
 LDFLAGS += $(CFLAGS)
 
 CPPS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.cpp))

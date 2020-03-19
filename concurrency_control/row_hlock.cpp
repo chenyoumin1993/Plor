@@ -55,7 +55,11 @@ Row_hlock::access(txn_man * txn, TsType type, row_t * local_row) {
 
 void
 Row_hlock::write(row_t * data, uint64_t tid) {
+#if INTERACTIVE_MODE == 1
+	_row->remote_write(data);
+#else
 	_row->copy(data);
+#endif
 	WrLockItem l_old, l_new;
 
 _start:
@@ -75,9 +79,9 @@ Row_hlock::lock_wr(txn_man *txn) {
 	WrLockItem l_old, l_new;
 	// who_am_i = txn->get_thd_id();
 	// my_ts = txn->get_ts();
-	if (lockWr->_tid == (txn->get_thd_id() + 1)) {
-		printf("tid = %d, owner_ts = %d, cur_ts = %d\n", txn->get_thd_id(), owner_ts, txn->get_ts());
-	}
+	// if (lockWr->_tid == (txn->get_thd_id() + 1)) {
+		// printf("tid = %d, owner_ts = %d, cur_ts = %d\n", txn->get_thd_id(), owner_ts, txn->get_ts());
+	// }
 	assert(lockWr->_tid != (txn->get_thd_id() + 1) && lockWr->_tid <= THREAD_CNT);
 
 	ts_t wait_start = get_sys_clock();

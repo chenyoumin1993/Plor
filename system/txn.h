@@ -10,6 +10,7 @@ class row_t;
 class table_t;
 class base_query;
 class INDEX;
+class persistent_log;
 
 // each thread has a txn_man. 
 // a txn_man corresponds to a single transaction.
@@ -45,6 +46,7 @@ public:
 	workload * h_wl;
 	myrand * mrand;
 	uint64_t abort_cnt;
+	persistent_log *log;
 
 	virtual RC 		run_txn(base_query * m_query, coro_yield_t &yield, int coro_id) = 0;
 	uint64_t 		get_thd_id();

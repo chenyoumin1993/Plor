@@ -22,12 +22,19 @@ public:
 	map<string, table_t *> tables;
 	map<string, INDEX *> indexes;
 
+	INDEX *indexes_[32]; // 32 indexes at most
+
 	
 	// initialize the tables and indexes.
 	virtual RC init();
 	virtual RC init_schema(string schema_file);
 	virtual RC init_table()=0;
 	virtual RC get_txn_man(txn_man *& txn_manager, thread_t * h_thd)=0;
+
+	int read_row_data(int index_cnt, uint64_t primary_key, void *buf);
+	void write_row_data(int index_cnt, uint64_t primary_key, int size, void *buf);
+
+	void update_index_accessed(INDEX *index);
 	
 	bool sim_done;
 protected:

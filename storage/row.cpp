@@ -18,11 +18,17 @@
 #include "row_olock.h"
 #include "row_hlock.h"
 
-#include "rpc.h"
-
 #if INTERACTIVE_MODE == 1
-extern Rpc rpc;
-extern __thread int mytid;
+#include "rpc.h"
+extern thread_local erpc::Rpc<erpc::CTransport> *rpc;
+extern thread_local erpc::MsgBuffer req[N_REPLICAS];
+extern thread_local erpc::MsgBuffer resp[N_REPLICAS];
+extern thread_local int session_num[N_REPLICAS];
+extern thread_local int outstanding_msg_cnt;
+
+extern __thread int cur_index_cnt;
+
+void cont_func(void *, void *) { outstanding_msg_cnt --; }
 #endif
 
 
@@ -44,6 +50,7 @@ void
 row_t::init(int size) 
 {
 	data = (char *) _mm_malloc(size, 64);
+	this->table = NULL;
 }
 
 RC 
@@ -144,14 +151,52 @@ char * row_t::get_data() { return data; }
 void row_t::set_data(char * data, uint64_t size) { 
 	// ASSERT(this->data != data);
 #if INTERACTIVE_MODE == 1
-	rpc.rpcCopy(mytid, this->data, data, size);
+	// Remote read ...
+	ReadRowRequest *r =  reinterpret_cast<ReadRowRequest *>(req[0].buf);
+	r->index_cnt = cur_index_cnt;
+	r->primary_key = this->get_primary_key();
+
+	rpc->resize_msg_buffer(&req[0], sizeof(ReadRowRequest));
+
+	rpc->enqueue_request(session_num[0], kReadType, &req[0], &resp[0], cont_func, nullptr);
+	outstanding_msg_cnt += 1;
+
+	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
+
+	// Copy to original place.
+	memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
 #else
 	memcpy(this->data, data, size);
 #endif
 }
 // copy from the src to this
 void row_t::copy(row_t * src) {
+	assert(src->get_table() != NULL);
+	assert(src->get_table()->get_schema() != NULL);
 	set_data(src->get_data(), src->get_tuple_size());
+}
+
+void row_t::remote_write(row_t * src) {
+	// Remote write ...
+#if INTERACTIVE_MODE == 1
+	WriteRowRequest *r =  reinterpret_cast<WriteRowRequest *>(req[0].buf);
+	r->index_cnt = cur_index_cnt;
+	r->size = this->get_tuple_size();
+	r->primary_key = this->get_primary_key();
+	memcpy(r->buf, src, this->get_tuple_size());
+
+	rpc->resize_msg_buffer(&req[0], sizeof(WriteRowRequest) - (MAX_TUPLE_SIZE - this->get_tuple_size()));
+
+	for (int i = 0; i < N_REPLICAS; ++i) {
+		rpc->enqueue_request(session_num[i], kWriteType, &req[0], &resp[i], cont_func, nullptr);
+		outstanding_msg_cnt += 1;
+	}
+
+	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
+
+	// Copy to original place.
+	memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
+#endif
 }
 
 #if CC_ALG == HLOCK
@@ -183,7 +228,11 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 
 	if (rc == RCOK) {
 	#if INTERACTIVE_MODE == 0
-		row = this;
+		if (CC_ALG != DLOCK) {
+			row = this;
+		} else if (type == WR) {
+			row->copy(this);
+		}
 	#else
 		assert(row != NULL);
 		row->copy(this);
@@ -278,10 +327,16 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		endtime = get_sys_clock();
 		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
 	#if INTERACTIVE_MODE == 0
-		row = this;
+		if (CC_ALG != DLOCK) {
+			row = this;
+		} else if (type == WR && rc == RCOK) {
+			row->copy(this);
+		}
 	#else
-		assert(row != NULL);
-		row->copy(this);
+		if (rc == RCOK) {
+			assert(row != NULL);
+			row->copy(this);
+		}
 	#endif
 	}
 	return rc;
@@ -329,6 +384,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 #elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
 	// like OCC, tictoc also makes a local copy for each read/write
 	row->table = get_table();
+	row->set_primary_key(get_primary_key());
 	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
 	rc = this->manager->access(txn, ts_type, row);
 	return rc;
@@ -501,18 +557,36 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (cf. row_ts.cpp)
 void row_t::return_row(access_t type, txn_man * txn, row_t * row) {	
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK
 #if INTERACTIVE_MODE == 0
 	assert (row == NULL || row == this || type == XP);
 #endif
 	if (ROLL_BACK && type == XP && INTERACTIVE_MODE == 0) {// recover from previous writes.
 		this->copy(row);
 	}
+
+	if (INTERACTIVE_MODE == 1 && type == WR) {
+		// commit.
+		// this->copy(row);
+		this->remote_write(row);
+	}
+
 	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;
 
 	this->manager->lock_release(lt, txn);
 
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC 
+#elif CC_ALG == DLOCK
+	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;
+	if (type == WR && row) {
+	#if INTERACTIVE_MODE == 1
+		this->remote_write(row);
+	#else
+		this->copy(row);
+	#endif
+	}
+	this->manager->lock_release(lt, txn);
+
+#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC
 	// for RD or SCAN or XP, the row should be deleted.
 	// because all WR should be companied by a RD
 	// for MVCC RD, the row is not copied, so no need to free. 

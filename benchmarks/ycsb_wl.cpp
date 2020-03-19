@@ -33,6 +33,9 @@ RC ycsb_wl::init_schema(string schema_file) {
 	workload::init_schema(schema_file);
 	the_table = tables["MAIN_TABLE"]; 	
 	the_index = indexes["MAIN_INDEX"];
+
+	indexes_[0] = the_index;
+	indexes_[1] = NULL;
 	return RCOK;
 }
 	

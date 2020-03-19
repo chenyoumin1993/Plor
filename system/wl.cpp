@@ -8,6 +8,8 @@
 #include "catalog.h"
 #include "mem_alloc.h"
 
+__thread int cur_index_cnt = 0;
+
 RC workload::init() {
 	sim_done = false;
 	return RCOK;
@@ -124,4 +126,25 @@ void workload::index_insert(INDEX * index, uint64_t key, row_t * row, int64_t pa
     assert( index->index_insert(key, m_item, pid) == RCOK );
 }
 
+int workload::read_row_data(int index_cnt, uint64_t primary_key, void *buf) {
+	itemid_t * item;
+	indexes_[index_cnt]->index_read(primary_key, item, 0, 0); // assume one partition, FIXME.
+	row_t * row = ((row_t *)item->location);
+	memcpy(buf, row->get_data(), row->get_tuple_size());
+	return row->get_tuple_size();
+}
 
+void workload::write_row_data(int index_cnt, uint64_t primary_key, int size, void *buf) {
+	itemid_t * item;
+	indexes_[index_cnt]->index_read(primary_key, item, 0, 0); // assume one partition, FIXME.
+	row_t * row = ((row_t *)item->location);
+	memcpy(row->get_data(), buf, row->get_tuple_size());
+}
+
+void workload::update_index_accessed(INDEX *index) {
+	int i = 0;
+	for (i = 0; i < 32; ++i) 
+		if (indexes_[i] == index)
+			break;
+	cur_index_cnt = i;
+}

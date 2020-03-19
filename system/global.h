@@ -138,6 +138,28 @@ extern uint64_t waiting_2_commit_time_dis[1000];
 extern uint64_t waiting_2_abort_time_dis[1000];
 // #endif
 
+#if INTERACTIVE_MODE == 1
+static const char replicas[][32] = {"aep5"};
+static const std::string replicanames[] = {"10.0.2.134"};
+static const std::string clientname = "10.0.2.135";
+static constexpr uint16_t kUDPPortBase = 31850;
+static constexpr uint8_t kReadType = 2;
+static constexpr uint8_t kWriteType = 3;
+
+struct ReadRowRequest {
+	int index_cnt;
+	uint64_t primary_key;
+};
+
+struct WriteRowRequest {
+	int index_cnt;
+	int size;
+	uint64_t primary_key;
+	char buf[MAX_TUPLE_SIZE];
+};
+
+#endif
+
 enum RC { RCOK, Commit, Abort, WAIT, ERROR, FINISH};
 
 /* Thread */

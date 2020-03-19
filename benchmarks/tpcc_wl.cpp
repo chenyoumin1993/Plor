@@ -47,6 +47,14 @@ RC tpcc_wl::init_schema(const char * schema_file) {
 	i_customer_id = indexes["CUSTOMER_ID_IDX"];
 	i_customer_last = indexes["CUSTOMER_LAST_IDX"];
 	i_stock = indexes["STOCK_IDX"];
+
+	indexes_[0] = i_item;
+	indexes_[1] = i_warehouse;
+	indexes_[3] = i_district;
+	indexes_[4] = i_customer_id;
+	indexes_[5] = i_customer_last;
+	indexes_[6] = i_stock;
+	indexes_[7] = NULL;
 	return RCOK;
 }
 

@@ -234,7 +234,7 @@ inline void set_affinity(uint64_t thd_id) {
 	uint64_t processor_id = a / 10 + (a % 10) * 4;
 	processor_id += (thd_id / 40) * 40;
 	 */
-	thd_id += 16;
+	// thd_id += 16;
 	cpu_set_t  mask;
 	CPU_ZERO(&mask);
 	CPU_SET(thd_id, &mask);

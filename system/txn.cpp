@@ -9,10 +9,15 @@
 #include "catalog.h"
 #include "index_btree.h"
 #include "index_hash.h"
+#include "log.h"
 
 void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	this->h_thd = h_thd;
 	this->h_wl = h_wl;
+
+	log = new persistent_log();
+	log->init(thd_id);
+
 	pthread_mutex_init(&txn_lock, NULL);
 	lock_ready = false;
 	ready_part = 0;
@@ -89,6 +94,20 @@ void txn_man::cleanup(RC rc) {
 	return;
 #endif
 
+#if PERSISTENT_LOG == 1 && (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK || CC_ALG == OLOCK)
+	if (rc != Abort) {
+		// Log TX Begin.
+		log->log_tx_meta(get_txn_id(), wr_cnt);
+
+		for (int rid = row_cnt - 1; rid >= 0; rid --) {
+			if (accesses[rid]->type == WR)
+				log->log_content(accesses[rid]->orig_row->get_primary_key(), 
+					accesses[rid]->orig_row->get_data(), 
+					accesses[rid]->orig_row->get_tuple_size());
+		}
+	}
+#endif
+
 	if (CC_ALG == OLOCK || CC_ALG == DLOCK)
 		this->ex_mode = true;
 	
@@ -115,14 +134,16 @@ void txn_man::cleanup(RC rc) {
 					CC_ALG == NO_WAIT || 
 					CC_ALG == WAIT_DIE || 
 					CC_ALG == WOUND_WAIT ||
-					CC_ALG == OLOCK ||
-					CC_ALG == DLOCK)) 
-		{
-			orig_r->return_row(type, this, accesses[rid]->orig_data);
+					CC_ALG == OLOCK)) {
+			// Aborted TX with 2PL running at one-shot mode needs Roll-back.
+			if (INTERACTIVE_MODE == 0)
+				orig_r->return_row(type, this, accesses[rid]->orig_data);
 		} else {
+			assert(accesses[rid]->data->table != NULL);
 			orig_r->return_row(type, this, accesses[rid]->data);
 		}
-#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && INTERACTIVE_MODE == 0
+
+#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && CC_ALG != DLOCK && INTERACTIVE_MODE == 0
 		accesses[rid]->data = NULL;
 #endif
 	}
@@ -131,13 +152,17 @@ void txn_man::cleanup(RC rc) {
 		for (UInt32 i = 0; i < insert_cnt; i ++) {
 			row_t * row = insert_rows[i];
 			assert(g_part_alloc == false);
-#if CC_ALG != HSTORE && CC_ALG != OCC && CC_ALG != HLOCK
+#if CC_ALG != HSTORE && CC_ALG != OCC
 			mem_allocator.free(row->manager, 0);
 #endif
 			row->free_row();
 			mem_allocator.free(row, sizeof(row));
 		}
 	}
+
+	if (PERSISTENT_LOG == 1 && rc != Abort)
+		log->log_end();
+
 	row_cnt = 0;
 	wr_cnt = 0;
 	insert_cnt = 0;
@@ -165,12 +190,12 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	if (accesses[row_cnt] == NULL) {
 		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
 		accesses[row_cnt] = access;
-#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == HLOCK)
+#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == DLOCK || CC_ALG == HLOCK)
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->orig_data->init(MAX_TUPLE_SIZE);
-#elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
+#elif (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK)
 #if INTERACTIVE_MODE == 1
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
@@ -186,6 +211,12 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	*/
 	
 	rc = row->get_row(type, this, accesses[ row_cnt ]->data, yield, coro_id);
+
+	if (accesses[row_cnt]->data != NULL && accesses[row_cnt]->data->table == NULL) {
+		// it can be NULL: for interactive mode or in DLOCK.
+		accesses[row_cnt]->data->set_primary_key(row->get_primary_key());
+		accesses[row_cnt]->data->table = row->get_table();
+	}
 
 	wait_cycles(WAIT_CYCLE);
 
@@ -203,7 +234,7 @@ row_t * txn_man::get_row(row_t * row, access_t type, coro_yield_t &yield, int co
 	accesses[row_cnt]->history_entry = history_entry;
 #endif
 
-#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK)
+#if ROLL_BACK && (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK)
 	if (type == WR && INTERACTIVE_MODE == 0) {
 		accesses[row_cnt]->orig_data->table = row->get_table();
 		accesses[row_cnt]->orig_data->copy(row);
@@ -313,6 +344,7 @@ void txn_man::insert_row(row_t * row, table_t * table) {
 
 itemid_t *
 txn_man::index_read(INDEX * index, idx_key_t key, int part_id) {
+	h_wl->update_index_accessed(index);
 	uint64_t starttime = get_sys_clock();
 	itemid_t * item;
 	index->index_read(key, item, part_id, get_thd_id());
@@ -322,6 +354,7 @@ txn_man::index_read(INDEX * index, idx_key_t key, int part_id) {
 
 void 
 txn_man::index_read(INDEX * index, idx_key_t key, int part_id, itemid_t *& item) {
+	h_wl->update_index_accessed(index);
 	uint64_t starttime = get_sys_clock();
 	index->index_read(key, item, part_id, get_thd_id());
 	INC_TMP_STATS(get_thd_id(), time_index, get_sys_clock() - starttime);

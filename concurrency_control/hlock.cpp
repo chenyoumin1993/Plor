@@ -1,6 +1,7 @@
 #include "txn.h"
 #include "row.h"
 #include "row_hlock.h"
+#include "log.h"
 
 #if CC_ALG == HLOCK
 
@@ -35,7 +36,7 @@ txn_man::validate_hlock()
 
 	int num_locks = 0;
 	ts_t max_tid = 0;
-	bool done = false;
+	// bool done = false;
 	int ret = 0;
 
 	// lock all rows in the write set.
@@ -78,6 +79,14 @@ final:
 		asm volatile ("sfence" ::: "memory");
 		cleanup(rc);
 	} else {
+	#if PERSISTENT_LOG == 1
+		log->log_tx_meta(get_txn_id(), wr_cnt);
+		for (int i = 0; i < wr_cnt; i++) {
+			log->log_content(accesses[ write_set[i] ]->orig_row->get_primary_key(), 
+				accesses[ write_set[i] ]->orig_row->get_data(), 
+				accesses[ write_set[i] ]->orig_row->get_tuple_size());
+		}
+	#endif
 		for (int i = 0; i < wr_cnt; i++) {
 			Access * access = accesses[ write_set[i] ];
 			access->orig_row->manager->write( 
