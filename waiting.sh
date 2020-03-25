@@ -5,9 +5,9 @@ replace()
 }
 
 #CC_AGS=(WOUND_WAIT DLOCK SILO)
-CC_AGS=(NO_WAIT WAIT_DIE)
-MAX_THD=(1 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64)
-ZIPF=(0.99)
+CC_AGS=(HLOCK)
+MAX_THD=(1 4 8 12 16 20 24 28 32 36)
+ZIPF=(0.1)
 READ=(0.5)
 #WAIT=(0 1050 2100 4200)
 WAIT=(0)
@@ -34,7 +34,7 @@ do
 	printf "%.2f\t%.2f\t%.2f\t%d\t%s\t%d\t" $rd $wt $zip $t $cc $exec_t
 	make clean &> /dev/null
 	make -j &> /dev/null
-	timeout 60 ./rundb
+	timeout 60 numactl --membind=0 ./rundb
 	printf "\n"
 done
 done

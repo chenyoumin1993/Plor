@@ -36,7 +36,7 @@ public:
 class IndexHash  : public index_base
 {
 public:
-	RC 			init(uint64_t bucket_cnt, int part_cnt);
+	RC 			init_(uint64_t bucket_cnt, int part_cnt);
 	RC 			init(int part_cnt, 
 					table_t * table, 
 					uint64_t bucket_cnt);
@@ -46,6 +46,35 @@ public:
 	RC	 		index_read(idx_key_t key, itemid_t * &item, int part_id=-1);	
 	RC	 		index_read(idx_key_t key, itemid_t * &item,
 							int part_id=-1, int thd_id=0);
+	
+	RC index_read_multiple(idx_key_t key, itemid_t** items,
+                         size_t& count, int part_id=-1) {
+		(void)key;
+		(void)items;
+		(void)count;
+		assert(false);
+		return ERROR;
+	}
+	RC index_read_range(idx_key_t min_key, idx_key_t max_key,
+                      itemid_t** items, size_t& count, int part_id) {
+		(void)min_key;
+		(void)max_key;
+		(void)items;
+		(void)count;
+		(void)part_id;
+		assert(false);
+		return ERROR;
+	}
+	RC index_read_range_rev(idx_key_t min_key, idx_key_t max_key,
+                          itemid_t** items, size_t& count, int part_id) {
+		(void)min_key;
+		(void)max_key;
+		(void)items;
+		(void)count;
+		(void)part_id;
+		assert(false);
+		return ERROR;
+	}
 private:
 	void get_latch(BucketHeader * bucket);
 	void release_latch(BucketHeader * bucket);

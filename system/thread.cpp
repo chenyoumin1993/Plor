@@ -33,6 +33,8 @@ txn_man *txn_tb[THREAD_CNT];
 __thread int mytid;
 char _pad2222[4096];
 
+// extern thread_local int lock_cnt;
+
 void thread_t::init(uint64_t thd_id, workload * workload) {
 	_thd_id = thd_id;
 	_wl = workload;
@@ -384,6 +386,7 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 	}
 _end:
+	// printf("lock_cnt = %d\n", lock_cnt);
 	// assert(false);
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
 		printf("COMMIT\t%lld\t%lld\t%lld\t%lld\t%lld\t", 

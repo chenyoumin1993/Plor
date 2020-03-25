@@ -73,6 +73,7 @@ txn_man::validate_hlock()
 	else 
 		_cur_tid ++;
 final:
+	rc = apply_index_changes(rc);
 	if (rc == Abort) {
 		for (int i = 0; i < num_locks; i++) 
 			accesses[ write_set[i] ]->orig_row->manager->unlock_wr(this);
@@ -87,6 +88,11 @@ final:
 				accesses[ write_set[i] ]->orig_row->get_tuple_size());
 		}
 	#endif
+		for (UInt32 i = 0; i < insert_cnt; i++) {
+			row_t * row = insert_rows[i];
+      		row->manager->unlock_wr(this);  // unlocking is done as well
+		}
+
 		for (int i = 0; i < wr_cnt; i++) {
 			Access * access = accesses[ write_set[i] ];
 			access->orig_row->manager->write( 

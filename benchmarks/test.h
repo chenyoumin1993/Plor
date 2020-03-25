@@ -14,7 +14,7 @@ public:
 	RC get_txn_man(txn_man *& txn_manager, thread_t * h_thd);
 	void summarize();
 	void tick() { time = get_sys_clock(); };
-	INDEX * the_index;
+	index_base * the_index;
 	table_t * the_table;
 private:
 	uint64_t time;

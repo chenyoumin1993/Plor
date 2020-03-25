@@ -20,9 +20,10 @@ class workload
 public:
 	// tables indexed by table name
 	map<string, table_t *> tables;
-	map<string, INDEX *> indexes;
+	map<string, index_base *> indexes;
 
-	INDEX *indexes_[32]; // 32 indexes at most
+	table_t *tables_[32];
+	index_base *indexes_[32]; // 32 indexes at most
 
 	
 	// initialize the tables and indexes.
@@ -33,12 +34,14 @@ public:
 
 	int read_row_data(int index_cnt, uint64_t primary_key, void *buf);
 	void write_row_data(int index_cnt, uint64_t primary_key, int size, void *buf);
+	void insert_row_data(int index_cnt, uint64_t primary_key, int size, void *buf);
+	void remove_row_data(int index_cnt, uint64_t primary_key);
 
-	void update_index_accessed(INDEX *index);
+	void update_index_accessed(index_base *index);
 	
 	bool sim_done;
 protected:
 	void index_insert(string index_name, uint64_t key, row_t * row);
-	void index_insert(INDEX * index, uint64_t key, row_t * row, int64_t part_id = -1);
+	void index_insert(index_base * index, uint64_t key, row_t * row, int64_t part_id = -1);
 };
 

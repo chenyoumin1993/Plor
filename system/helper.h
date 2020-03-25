@@ -184,10 +184,10 @@ uint64_t merge_idx_key(uint64_t key1, uint64_t key2, uint64_t key3);
 
 extern timespec * res;
 inline uint64_t get_server_clock() {
-#if defined(__i386__)
+#if 0//defined(__i386__)
     uint64_t ret;
     __asm__ __volatile__("rdtsc" : "=A" (ret));
-#elif defined(__x86_64__)
+#elif 0//defined(__x86_64__)
     unsigned hi, lo;
     __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
     uint64_t ret = ( (uint64_t)lo)|( ((uint64_t)hi)<<32 );
@@ -235,6 +235,7 @@ inline void set_affinity(uint64_t thd_id) {
 	processor_id += (thd_id / 40) * 40;
 	 */
 	// thd_id += 16;
+	thd_id = (thd_id % 2 == 0) ? (thd_id / 2) : ((thd_id - 1) / 2 + 18);
 	cpu_set_t  mask;
 	CPU_ZERO(&mask);
 	CPU_SET(thd_id, &mask);

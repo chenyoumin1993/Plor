@@ -10,6 +10,7 @@ class row_t;
 class table_t;
 class base_query;
 class INDEX;
+class index_base;
 class persistent_log;
 
 // each thread has a txn_man. 
@@ -108,17 +109,44 @@ public:
 
 	// For VLL
 	TxnType 		vll_txn_type;
-	itemid_t *		index_read(INDEX * index, idx_key_t key, int part_id);
-	void 			index_read(INDEX * index, idx_key_t key, int part_id, itemid_t *& item);
+	itemid_t *		index_read(index_base * index, idx_key_t key, int part_id);
+	void 			index_read(index_base * index, idx_key_t key, int part_id, itemid_t *& item);
+
+	RC				index_read_multiple(index_base* index, idx_key_t key, itemid_t** items, size_t& count, int part_id);
+	RC				index_read_range(index_base* index, idx_key_t min_key, idx_key_t max_key, itemid_t** items, size_t& count, int part_id);
+	RC				index_read_range_rev(index_base* index, idx_key_t min_key, idx_key_t max_key, itemid_t** items, size_t& count, int part_id);
+
 	row_t * 		get_row(row_t * row, access_t type, coro_yield_t &yield, int coro_id);
 	row_t * 		get_row(row_t * row, access_t type);
 	void *			reserve();
+	RC apply_index_changes(RC rc);
+
+	bool insert_idx(index_base* index, uint64_t key, row_t* row, int part_id);
+	bool remove_idx(index_base* index, uint64_t key, row_t* row, int part_id);
+	
 protected:	
 	void 			insert_row(row_t * row, table_t * table);
+	bool 			remove_row(row_t* row);
 private:
 	// insert rows
 	uint64_t 		insert_cnt;
 	row_t * 		insert_rows[MAX_ROW_PER_TXN];
+	uint64_t 		remove_cnt;
+	row_t * 		remove_rows[MAX_ROW_PER_TXN];
+
+	// insert/remove indexes
+	uint64_t 		   insert_idx_cnt;
+	index_base*   insert_idx_idx[MAX_ROW_PER_TXN];
+	idx_key_t	     insert_idx_key[MAX_ROW_PER_TXN];
+	row_t* 		     insert_idx_row[MAX_ROW_PER_TXN];
+	int	       	   insert_idx_part_id[MAX_ROW_PER_TXN];
+
+	uint64_t 		   remove_idx_cnt;
+	index_base*   remove_idx_idx[MAX_ROW_PER_TXN];
+	idx_key_t	     remove_idx_key[MAX_ROW_PER_TXN];
+	int	      	   remove_idx_part_id[MAX_ROW_PER_TXN];
+
+
 	txnid_t 		txn_id;
 	ts_t 			timestamp;
 
@@ -146,4 +174,6 @@ private:
 	void* entries;
 	int n_entry;
 #endif
+	
+	RC validate();
 };

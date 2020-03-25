@@ -38,6 +38,8 @@ bool start_perf = false;
 #include "rpc.h"
 void read_handler(erpc::ReqHandle *req_handle, void *);
 void write_handler(erpc::ReqHandle *req_handle, void *);
+void insert_handler(erpc::ReqHandle *req_handle, void *);
+void remove_handler(erpc::ReqHandle *req_handle, void *);
 void storage_service(int id, int replica_cnt);
 extern thread_local erpc::Rpc<erpc::CTransport> *rpc;
 extern erpc::Nexus *nexus;
@@ -85,6 +87,8 @@ int main(int argc, char* argv[])
 		nexus = new erpc::Nexus(server_uri, 0, 0);
 		nexus->register_req_func(kReadType, read_handler);
 		nexus->register_req_func(kWriteType, write_handler);
+		nexus->register_req_func(kInsertType, insert_handler);
+		nexus->register_req_func(kRemoveType, remove_handler);
 	} else {
 		// TX Manager.
 		std::string client_uri = clientname + ":" + std::to_string(kUDPPortBase);
@@ -272,6 +276,34 @@ void write_handler(erpc::ReqHandle *req_handle, void *) {
 	WriteRowRequest *r = reinterpret_cast<WriteRowRequest *>(req->buf);
 	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
 	m_wl->write_row_data(r->index_cnt, r->primary_key, r->size, reinterpret_cast<void *>(r->buf));
+
+	// Send response message.
+	rpc->resize_msg_buffer(&resp, 0);
+	rpc->enqueue_response(req_handle, &resp);
+}
+
+void insert_handler(erpc::ReqHandle *req_handle, void *) {
+	auto req = req_handle->get_req_msgbuf();
+	auto &resp = req_handle->pre_resp_msgbuf;
+	
+	// Process the requests.
+	InsertRowRequest *r = reinterpret_cast<InsertRowRequest *>(req->buf);
+	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
+	m_wl->insert_row_data(r->index_cnt, r->primary_key, r->size, reinterpret_cast<void *>(r->buf));
+
+	// Send response message.
+	rpc->resize_msg_buffer(&resp, 0);
+	rpc->enqueue_response(req_handle, &resp);
+}
+
+void remove_handler(erpc::ReqHandle *req_handle, void *) {
+	auto req = req_handle->get_req_msgbuf();
+	auto &resp = req_handle->pre_resp_msgbuf;
+	
+	// Process the requests.
+	RemoveRowRequest *r = reinterpret_cast<RemoveRowRequest *>(req->buf);
+	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
+	m_wl->remove_row_data(r->index_cnt, r->primary_key);
 
 	// Send response message.
 	rpc->resize_msg_buffer(&resp, 0);

@@ -3,7 +3,7 @@
 #include "mem_alloc.h"
 #include "table.h"
 
-RC IndexHash::init(uint64_t bucket_cnt, int part_cnt) {
+RC IndexHash::init_(uint64_t bucket_cnt, int part_cnt) {
 	_bucket_cnt = bucket_cnt;
 	_bucket_cnt_per_part = bucket_cnt / part_cnt;
 	_buckets = new BucketHeader * [part_cnt];
@@ -17,7 +17,7 @@ RC IndexHash::init(uint64_t bucket_cnt, int part_cnt) {
 
 RC 
 IndexHash::init(int part_cnt, table_t * table, uint64_t bucket_cnt) {
-	init(bucket_cnt, part_cnt);
+	init_(bucket_cnt, part_cnt);
 	this->table = table;
 	return RCOK;
 }

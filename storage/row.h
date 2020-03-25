@@ -116,6 +116,7 @@ public:
   #endif
 	char * data;
 	table_t * table;
+	volatile uint8_t			is_deleted;
 private:
 	// primary key should be calculated from the data stored in the row.
 	uint64_t 		_primary_key;

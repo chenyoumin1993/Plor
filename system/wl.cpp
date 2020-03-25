@@ -5,6 +5,7 @@
 #include "table.h"
 #include "index_hash.h"
 #include "index_btree.h"
+#include "index_mbtree.h"
 #include "catalog.h"
 #include "mem_alloc.h"
 
@@ -80,23 +81,33 @@ RC workload::init_schema(string schema_file) {
 				items.push_back(token);
 		    	line.erase(0, pos + 1);
 			}
-			
+
 			string tname(items[0]);
-			INDEX * index = (INDEX *) _mm_malloc(sizeof(INDEX), 64);
-			new(index) INDEX();
+			index_base * index = (index_base *) _mm_malloc(sizeof(INDEX), 64);
+			if (items.size() > 2) { // Index type has been specified in the schema.
+				string index_type(items[2]);
+				if (index_type == "HASH") {
+					new(index) IndexHash();
+				} else if (index_type == "BTREE") {
+					new(index) IndexMBTree();
+				} else {
+					printf("Unknown index type.\n");
+					assert(false);
+				}
+			} else {
+				new(index) INDEX(); // Determined by the config.h
+			}
 			int part_cnt = (CENTRAL_INDEX)? 1 : g_part_cnt;
 			if (tname == "ITEM")
 				part_cnt = 1;
-#if INDEX_STRUCT == IDX_HASH
+
 	#if WORKLOAD == YCSB
 			index->init(part_cnt, tables[tname], g_synth_table_size * 2);
 	#elif WORKLOAD == TPCC
 			assert(tables[tname] != NULL);
 			index->init(part_cnt, tables[tname], stoi( items[1] ) * part_cnt);
 	#endif
-#else
-			index->init(part_cnt, tables[tname]);
-#endif
+
 			indexes[iname] = index;
 		}
     }
@@ -112,7 +123,7 @@ void workload::index_insert(string index_name, uint64_t key, row_t * row) {
 	index_insert(index, key, row);
 }
 
-void workload::index_insert(INDEX * index, uint64_t key, row_t * row, int64_t part_id) {
+void workload::index_insert(index_base * index, uint64_t key, row_t * row, int64_t part_id) {
 	uint64_t pid = part_id;
 	if (part_id == -1)
 		pid = get_part_id(row);
@@ -141,7 +152,31 @@ void workload::write_row_data(int index_cnt, uint64_t primary_key, int size, voi
 	memcpy(row->get_data(), buf, row->get_tuple_size());
 }
 
-void workload::update_index_accessed(INDEX *index) {
+void workload::insert_row_data(int index_cnt, uint64_t primary_key, int size, void *buf) {
+	row_t *row;
+	uint64_t row_id;
+
+	tables_[index_cnt]->get_new_row(row, 0, row_id);
+
+	row->set_primary_key(primary_key);
+
+	itemid_t * m_item =
+		(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), 0);
+
+	m_item->init();
+	m_item->type = DT_row;
+	m_item->location = row;
+	m_item->valid = true;
+
+	indexes_[index_cnt]->index_insert(primary_key, m_item, 0);
+}
+
+void workload::remove_row_data(int index_cnt, uint64_t primary_key) {
+	// Not implemented.
+	return;
+}
+
+void workload::update_index_accessed(index_base *index) {
 	int i = 0;
 	for (i = 0; i < 32; ++i) 
 		if (indexes_[i] == index)

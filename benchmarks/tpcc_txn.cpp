@@ -54,7 +54,7 @@ RC tpcc_txn_man::run_payment(tpcc_query * query) {
 	// TODO for variable length variable (string). Should store the size of 
 	// the variable.
 	key = query->w_id;
-	INDEX * index = _wl->i_warehouse;
+	index_base * index = _wl->i_warehouse;
 	item = index_read(index, key, wh_to_part(w_id));
 	assert(item != NULL);
 	row_t * r_wh = ((row_t *)item->location);
@@ -125,7 +125,7 @@ RC tpcc_txn_man::run_payment(tpcc_query * query) {
 		uint64_t key = custNPKey(query->c_last, query->c_d_id, query->c_w_id);
 		// XXX: the list is not sorted. But let's assume it's sorted... 
 		// The performance won't be much different.
-		INDEX * index = _wl->i_customer_last;
+		index_base * index = _wl->i_customer_last;
 		item = index_read(index, key, wh_to_part(c_w_id));
 		assert(item != NULL);
 		
@@ -163,7 +163,7 @@ RC tpcc_txn_man::run_payment(tpcc_query * query) {
 			WHERE c_w_id=:c_w_id AND c_d_id=:c_d_id AND c_id=:c_id;
 		+======================================================================*/
 		key = custKey(query->c_id, query->c_d_id, query->c_w_id);
-		INDEX * index = _wl->i_customer_id;
+		index_base * index = _wl->i_customer_id;
 		item = index_read(index, key, wh_to_part(c_w_id));
 		assert(item != NULL);
 		r_cust = (row_t *) item->location;
@@ -243,7 +243,7 @@ RC tpcc_txn_man::run_new_order(tpcc_query * query) {
 	RC rc = RCOK;
 	uint64_t key;
 	itemid_t * item;
-	INDEX * index;
+	index_base * index;
 	
 	bool remote = query->remote;
 	uint64_t w_id = query->w_id;
@@ -375,7 +375,7 @@ RC tpcc_txn_man::run_new_order(tpcc_query * query) {
 		+===============================================*/
 
 		uint64_t stock_key = stockKey(ol_i_id, ol_supply_w_id);
-		INDEX * stock_index = _wl->i_stock;
+		index_base * stock_index = _wl->i_stock;
 		itemid_t * stock_item;
 		index_read(stock_index, stock_key, wh_to_part(ol_supply_w_id), stock_item);
 		assert(item != NULL);

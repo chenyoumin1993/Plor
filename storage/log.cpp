@@ -67,7 +67,7 @@ void* persistent_log::append_data(void *src, uint64_t size) {
     void *old_tail = v_tail;
     
     assert(size < PER_LOG_SIZE);
-    assert(((uint64_t)log_buf + PER_LOG_SIZE) > (uint64_t)v_tail);
+    assert(((uint64_t)log_buf + PER_LOG_SIZE) >= (uint64_t)v_tail);
 
     if ((PER_LOG_SIZE - ((uint64_t)v_tail - (uint64_t)log_buf)) < size)
         v_tail = log;

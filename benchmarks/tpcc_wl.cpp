@@ -48,6 +48,14 @@ RC tpcc_wl::init_schema(const char * schema_file) {
 	i_customer_last = indexes["CUSTOMER_LAST_IDX"];
 	i_stock = indexes["STOCK_IDX"];
 
+	tables_[0] = t_item;
+	tables_[1] = t_warehouse;
+	tables_[3] = t_district;
+	tables_[4] = t_customer;
+	tables_[5] = t_customer;
+	tables_[6] = t_stock;
+	tables_[7] = NULL;
+
 	indexes_[0] = i_item;
 	indexes_[1] = i_warehouse;
 	indexes_[3] = i_district;

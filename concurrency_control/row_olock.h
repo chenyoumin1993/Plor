@@ -83,6 +83,13 @@ struct BitMap {
         return (arr[x] & (0x1u << y)) != 0;
     }
 
+    BitMap& operator=(BitMap &src) {
+        memcpy((void *)arr, (void *)src.arr, src.alloc_size);
+        _size = src._size;
+        alloc_size = src.alloc_size;
+        return *this;
+    }
+
     void Set(uint off) { // Atomically
         // uint8_t _old, _new;
         uint x, y;
@@ -391,6 +398,8 @@ public:
     RC lock_get(lock_t type, txn_man *txn);
     RC lock_release(lock_t type, txn_man *txn);
     void poll_lock_state(txn_man *txn);
+
+    RC validate(txn_man *txn);
 
 private:
     // ...

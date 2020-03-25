@@ -8,6 +8,8 @@ extern txn_man *txn_tb[];
 
 RingBuffer la[THREAD_CNT][BUFFER_LEN]; // Per-thread locking table.
 
+// thread_local int lock_cnt = 0;
+
 #if CC_ALG == OLOCK
 
 void Row_olock::init(row_t *row) {
@@ -321,6 +323,8 @@ RC Row_dlock::lock_get_sh(lock_t type, txn_man *txn) {
         asm volatile ("lfence" ::: "memory");
         return Abort;
     }
+    
+    // lock_cnt += 1;
 
     // Add myself to the bmp and go.
     if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
@@ -344,90 +348,127 @@ RC Row_dlock::lock_release(lock_t type, txn_man *txn) {
     }
 }
 
+RC Row_dlock::validate(txn_man *txn) {
+    if (txn->wound) {
+        return Abort;
+    }
+    
+    // bmpRd->Set(txn->get_thd_id());
+    // Check the readers, wound all the young readers and wait for all the old readers.
+    // Read a snapshot:
+    // BitMap bmpRdSnapshot = *bmpRd;
+
+    if (bmpRd->isEmpty())
+        return RCOK;
+
+    for (int i = 0; i < THREAD_CNT; ++i) {
+        // wait for older TXs and wound younger TXs.
+        if (bmpRd->isSet(i)/* && (i != (int)txn->get_thd_id())*/) {
+            if (txn_tb[i]->get_ts() > txn->get_ts()) {
+                // Kill him.
+                while (txn_tb[i] == NULL) ;
+                txn_tb[i]->wound = true;
+            } else {
+                // Wait it.
+                while (bmpRd->isSet(i) && !txn->wound && (txn_tb[i]->get_ts() < txn->get_ts())) {
+                    asm volatile ("lfence" ::: "memory");
+                    PAUSE
+                }
+                if (txn->wound) {
+                    // bmpRd->Unset(txn->get_thd_id());
+                    return Abort;
+                }
+            }
+        }
+    }
+    // bmpRd->Unset(txn->get_thd_id());
+    return RCOK;
+}
+
 RC Row_dlock::lock_release_ex(lock_t type, txn_man *txn) {
     Owner o, o_new;
     // uint32_t total_readers;
 
-    // If I was wounded, don't need to care about the readers, release the lock directly.
-    if (txn->wound) {
-        goto _release;
-    }
+    // // If I was wounded, don't need to care about the readers, release the lock directly.
+    // if (txn->wound) {
+    //     goto _release;
+    // }
 
-    if (bmpRd->isEmpty())
-        goto _release;
+    // if (bmpRd->isEmpty())
+    //     goto _release;
 
-    // Switch to EX mode and clean the readers.
-    if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
-        // Solution A.
-        bmpRd->Set(txn->get_thd_id());
-        // Check the readers, wound all the young readers and wait for all the old readers.
-        for (int i = 0; i < THREAD_CNT; ++i) {
-            // wait for older TXs and wound younger TXs.
-            if (bmpRd->isSet(i) && (i != (int)txn->get_thd_id())) {
-                if (txn_tb[i]->get_ts() > txn->get_ts()) {
-                    // Kill him.
-                    while (txn_tb[i] == NULL) ;
-                    txn_tb[i]->wound = true;
-                } else {
-                    // Wait it.
-                    while (bmpRd->isSet(i) && !txn->wound && (txn_tb[i]->get_ts() < txn->get_ts())) {
-                        asm volatile ("lfence" ::: "memory");
-                    }
-                    if (txn->wound) {
-                        bmpRd->Unset(txn->get_thd_id());
-                        goto _release;
-                    }
-                }
-            }
-        }
-        bmpRd->Unset(txn->get_thd_id());
-    } else {
-        // Solution B.
-        // 1. Scan the bitmap.
-        uint32_t *shared = (uint32_t *)dirLock._lt; // Point to the first 4~B (readBmp).
-        if (*shared != 0) {
-            for (int off = 0; off < 4; ++off) {
-                auto i = dirLock._lt[off];
-                if (i != 0) {
-                    if (txn_tb[i]->get_ts() > txn->get_ts()) {
-                        // Kill him.
-                        while (txn_tb[i] == NULL) ;
-                        txn_tb[i]->wound = true;
-                    } else {
-                        // Wait it.
-                        while (bmpRd->isSet(i) && !txn->wound) {
-                            asm volatile ("lfence" ::: "memory");
-                        }
-                        if (txn->wound) {
-                            bmpRd->Unset(txn->get_thd_id());
-                            goto _release;
-                        }
-                    }
-                }
-            }
-        }
+    // // Switch to EX mode and clean the readers.
+    // if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
+    //     // Solution A.
+    //     bmpRd->Set(txn->get_thd_id());
+    //     // Check the readers, wound all the young readers and wait for all the old readers.
+    //     for (int i = 0; i < THREAD_CNT; ++i) {
+    //         // wait for older TXs and wound younger TXs.
+    //         if (bmpRd->isSet(i) && (i != (int)txn->get_thd_id())) {
+    //             if (txn_tb[i]->get_ts() > txn->get_ts()) {
+    //                 // Kill him.
+    //                 while (txn_tb[i] == NULL) ;
+    //                 txn_tb[i]->wound = true;
+    //             } else {
+    //                 // Wait it.
+    //                 while (bmpRd->isSet(i) && !txn->wound && (txn_tb[i]->get_ts() < txn->get_ts())) {
+    //                     asm volatile ("lfence" ::: "memory");
+    //                 }
+    //                 if (txn->wound) {
+    //                     bmpRd->Unset(txn->get_thd_id());
+    //                     goto _release;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     bmpRd->Unset(txn->get_thd_id());
+    // } else {
+    //     // Solution B.
+    //     // 1. Scan the bitmap.
+    //     uint32_t *shared = (uint32_t *)dirLock._lt; // Point to the first 4~B (readBmp).
+    //     if (*shared != 0) {
+    //         for (int off = 0; off < 4; ++off) {
+    //             auto i = dirLock._lt[off];
+    //             if (i != 0) {
+    //                 if (txn_tb[i]->get_ts() > txn->get_ts()) {
+    //                     // Kill him.
+    //                     while (txn_tb[i] == NULL) ;
+    //                     txn_tb[i]->wound = true;
+    //                 } else {
+    //                     // Wait it.
+    //                     while (bmpRd->isSet(i) && !txn->wound) {
+    //                         asm volatile ("lfence" ::: "memory");
+    //                     }
+    //                     if (txn->wound) {
+    //                         bmpRd->Unset(txn->get_thd_id());
+    //                         goto _release;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
         
-        // 2. Scan the ringbuf.
-        uint64_t temp = readLock._slot; // Read a snapshot.
-        LockItem *me = (LockItem *)&temp;
-        if (me->off != (uint16_t)-1 && me->ID != (uint16_t)-1) {
-            for (int i = me->tail; i < me->head; i++) {
-                if (la[me->ID][me->off].e[i % RING_SIZE].ts > txn->get_ts()) {
-                    auto tid = la[me->ID][me->off].e[i % RING_SIZE].tid;
-                    while (txn_tb[tid] == NULL) ;
-                    txn_tb[tid]->wound = true;
-                } else {
-                    while (la[me->ID][me->off].e[i % RING_SIZE].ts != 0 && !txn->wound) {
-                        asm volatile ("lfence" ::: "memory");
-                    }
-                    if (txn->wound)
-                        goto _release;
-                }
-            }
-        }
-    }
+    //     // 2. Scan the ringbuf.
+    //     uint64_t temp = readLock._slot; // Read a snapshot.
+    //     LockItem *me = (LockItem *)&temp;
+    //     if (me->off != (uint16_t)-1 && me->ID != (uint16_t)-1) {
+    //         for (int i = me->tail; i < me->head; i++) {
+    //             if (la[me->ID][me->off].e[i % RING_SIZE].ts > txn->get_ts()) {
+    //                 auto tid = la[me->ID][me->off].e[i % RING_SIZE].tid;
+    //                 while (txn_tb[tid] == NULL) ;
+    //                 txn_tb[tid]->wound = true;
+    //             } else {
+    //                 while (la[me->ID][me->off].e[i % RING_SIZE].ts != 0 && !txn->wound) {
+    //                     asm volatile ("lfence" ::: "memory");
+    //                 }
+    //                 if (txn->wound)
+    //                     goto _release;
+    //             }
+    //         }
+    //     }
+    // }
 
-_release:
+// _release:
     if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
         if (bmpWr->isSet(txn->get_thd_id()))
             bmpWr->Unset(txn->get_thd_id());
@@ -480,6 +521,7 @@ RC Row_dlock::lock_release_sh(lock_t type, txn_man *txn) {
             assert(readLock.unlock((uint8_t)txn->get_thd_id()) == true);
         }
     }
+    // lock_cnt -= 1;
     return RCOK;
 }
 

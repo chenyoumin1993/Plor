@@ -164,11 +164,13 @@ void row_t::set_data(char * data, uint64_t size) {
 	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
 
 	// Copy to original place.
-	memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
+	assert(resp[0].get_data_size() == size);
+	memcpy(this->data, (void *)resp[0].buf, size);
 #else
 	memcpy(this->data, data, size);
 #endif
 }
+
 // copy from the src to this
 void row_t::copy(row_t * src) {
 	assert(src->get_table() != NULL);
@@ -195,7 +197,7 @@ void row_t::remote_write(row_t * src) {
 	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
 
 	// Copy to original place.
-	memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
+	// memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
 #endif
 }
 
@@ -230,11 +232,16 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 	#if INTERACTIVE_MODE == 0
 		if (CC_ALG != DLOCK) {
 			row = this;
-		} else if (type == WR) {
-			row->copy(this);
+		} else {
+			if (type == WR)
+				row->copy(this);
+			row->table = this->get_table();
+			row->set_primary_key(this->get_primary_key());
 		}
 	#else
 		assert(row != NULL);
+		row->table = this->get_table();
+		row->set_primary_key(this->get_primary_key());
 		row->copy(this);
 	#endif
 	} else if (rc == Abort) {} 
@@ -329,12 +336,17 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 	#if INTERACTIVE_MODE == 0
 		if (CC_ALG != DLOCK) {
 			row = this;
-		} else if (type == WR && rc == RCOK) {
-			row->copy(this);
+		} else if (rc == RCOK) {
+			if (type == WR)
+				row->copy(this);
+			row->table = this->get_table();
+			row->set_primary_key(this->get_primary_key());
 		}
 	#else
 		if (rc == RCOK) {
 			assert(row != NULL);
+			row->table = this->get_table();
+			row->set_primary_key(this->get_primary_key());
 			row->copy(this);
 		}
 	#endif
@@ -565,7 +577,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 		this->copy(row);
 	}
 
-	if (INTERACTIVE_MODE == 1 && type == WR) {
+	if (INTERACTIVE_MODE == 1 && type == WR && row != NULL) {
 		// commit.
 		// this->copy(row);
 		this->remote_write(row);

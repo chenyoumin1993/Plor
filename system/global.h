@@ -145,6 +145,8 @@ static const std::string clientname = "10.0.2.135";
 static constexpr uint16_t kUDPPortBase = 31850;
 static constexpr uint8_t kReadType = 2;
 static constexpr uint8_t kWriteType = 3;
+static constexpr uint8_t kInsertType = 4;
+static constexpr uint8_t kRemoveType = 5;
 
 struct ReadRowRequest {
 	int index_cnt;
@@ -156,6 +158,13 @@ struct WriteRowRequest {
 	int size;
 	uint64_t primary_key;
 	char buf[MAX_TUPLE_SIZE];
+};
+
+typedef WriteRowRequest InsertRowRequest;
+
+struct RemoveRowRequest {
+	int index_cnt;
+	uint64_t primary_key;
 };
 
 #endif
@@ -201,6 +210,8 @@ enum TsType {R_REQ, W_REQ, P_REQ, XP_REQ};
 // index structure for specific purposes. (e.g. non-primary key access should use hash)
 #if (INDEX_STRUCT == IDX_BTREE)
 #define INDEX		index_btree
+#elif (INDEX_STRUCT == IDX_MBTREE)
+#define INDEX		IndexMBTree
 #else  // IDX_HASH
 #define INDEX		IndexHash
 #endif
@@ -253,4 +264,3 @@ void valve_f(int id);
 #ifndef UINT64_MAX
 #define UINT64_MAX 		18446744073709551615UL
 #endif // UINT64_MAX
-

@@ -15,6 +15,8 @@ public:
 	
 	bool				validate(ts_t tid, bool in_write_set);
 	void				write(row_t * data, uint64_t tid);
+
+	void				set_tid(uint64_t tid);
 	
 	void 				lock();
 	void 				release();

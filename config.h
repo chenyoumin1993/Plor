@@ -1,7 +1,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 36
-#define CC_ALG SILO
+#define CORE_CNT 16
+#define CC_ALG DLOCK
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
@@ -21,7 +21,7 @@
 
 #define THREAD_CNT (CORO_CNT * CORE_CNT)
 
-#define WAIT_CYCLE 0
+#define WAIT_CYCLE 1
 
 #define BACKOFF_CYCLE 3750
 
@@ -49,7 +49,7 @@
 #define PAGE_SIZE					4096 
 #define CL_SIZE						64
 // CPU_FREQ is used to get accurate timing info 
-#define CPU_FREQ 					2.460296 	// in GHz/s
+#define CPU_FREQ 					2.4 	// in GHz/s
 
 // # of transactions to run for warmup
 #define WARMUP						0
@@ -93,7 +93,7 @@
 #define ENABLE_LATCH				false
 #define CENTRAL_INDEX				false
 #define CENTRAL_MANAGER 			false
-#define INDEX_STRUCT				IDX_HASH
+#define INDEX_STRUCT				IDX_MBTREE
 #define BTREE_ORDER 				16
 
 // [DL_DETECT] 
@@ -224,6 +224,7 @@ extern TestCases					g_test_case;
 // INDEX_STRUCT
 #define IDX_HASH 					1
 #define IDX_BTREE					2
+#define IDX_MTREE					3
 // WORKLOAD
 #define YCSB						1
 #define TPCC						2
@@ -257,6 +258,6 @@ extern TestCases					g_test_case;
 
 
 // Debug info
-#define PRINT_LAT_DEBUG				0
+#define PRINT_LAT_DEBUG				1
 #define BOOST_COROUTINES_NO_DEPRECATION_WARNING 1
 #endif

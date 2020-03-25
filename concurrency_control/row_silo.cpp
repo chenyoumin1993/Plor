@@ -18,6 +18,16 @@ Row_silo::init(row_t * row)
 #endif
 }
 
+void
+Row_silo::set_tid(uint64_t tid) {
+  assert(_tid_word & LOCK_BIT);
+#if ATOMIC_WORD
+	_tid_word = tid;
+#else
+	_tid = tid;
+#endif
+}
+
 RC
 Row_silo::access(txn_man * txn, TsType type, row_t * local_row) {
 #if ATOMIC_WORD
