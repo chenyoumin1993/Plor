@@ -26,7 +26,7 @@ extern thread_local erpc::MsgBuffer resp[N_REPLICAS];
 extern thread_local int session_num[N_REPLICAS];
 extern thread_local int outstanding_msg_cnt;
 
-extern __thread int cur_index_cnt;
+// extern __thread int cur_index_cnt;
 
 void cont_func(void *, void *) { outstanding_msg_cnt --; }
 #endif
@@ -40,7 +40,9 @@ RC
 row_t::init(table_t * host_table, uint64_t part_id, uint64_t row_id) {
 	_row_id = row_id;
 	_part_id = part_id;
+	this->version = 0;
 	this->table = host_table;
+	this->is_deleted = false;
 	Catalog * schema = host_table->get_schema();
 	int tuple_size = schema->get_tuple_size();
 	data = (char *) _mm_malloc(sizeof(char) * tuple_size, 64);
@@ -51,6 +53,8 @@ row_t::init(int size)
 {
 	data = (char *) _mm_malloc(size, 64);
 	this->table = NULL;
+	this->is_deleted = false;
+	this->version = 0;
 }
 
 RC 
@@ -136,6 +140,11 @@ GET_VALUE(double);
 GET_VALUE(UInt32);
 GET_VALUE(SInt32);
 
+void row_t::get_value_bak(int col_id, int64_t & value) {
+		int pos = get_schema()->get_field_index(col_id);
+		value = *(int64_t *)&data[pos];
+}
+
 char * row_t::get_value(int id) {
 	int pos = get_schema()->get_field_index(id);
 	return &data[pos];
@@ -148,13 +157,15 @@ char * row_t::get_value(char * col_name) {
 
 char * row_t::get_data() { return data; }
 
-void row_t::set_data(char * data, uint64_t size) { 
+void row_t::set_data(row_t *src, uint64_t size) {
+	char *data = src->get_data();
 	// ASSERT(this->data != data);
 #if INTERACTIVE_MODE == 1
 	// Remote read ...
 	ReadRowRequest *r =  reinterpret_cast<ReadRowRequest *>(req[0].buf);
-	r->index_cnt = cur_index_cnt;
-	r->primary_key = this->get_primary_key();
+	r->index_cnt = src->index_cnt;
+	assert(r->index_cnt != -1);
+	r->primary_key = src->get_primary_key();
 
 	rpc->resize_msg_buffer(&req[0], sizeof(ReadRowRequest));
 
@@ -164,8 +175,9 @@ void row_t::set_data(char * data, uint64_t size) {
 	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
 
 	// Copy to original place.
-	assert(resp[0].get_data_size() == size);
-	memcpy(this->data, (void *)resp[0].buf, size);
+	// assert(resp[0].get_data_size() == size);
+	// memcpy(this->data, (void *)resp[0].buf, size);
+	memcpy(this->data, data, size);
 #else
 	memcpy(this->data, data, size);
 #endif
@@ -175,14 +187,15 @@ void row_t::set_data(char * data, uint64_t size) {
 void row_t::copy(row_t * src) {
 	assert(src->get_table() != NULL);
 	assert(src->get_table()->get_schema() != NULL);
-	set_data(src->get_data(), src->get_tuple_size());
+	set_data(src, src->get_tuple_size());
 }
 
 void row_t::remote_write(row_t * src) {
 	// Remote write ...
 #if INTERACTIVE_MODE == 1
 	WriteRowRequest *r =  reinterpret_cast<WriteRowRequest *>(req[0].buf);
-	r->index_cnt = cur_index_cnt;
+	r->index_cnt = this->index_cnt;
+	assert(r->index_cnt != -1);
 	r->size = this->get_tuple_size();
 	r->primary_key = this->get_primary_key();
 	memcpy(r->buf, src, this->get_tuple_size());
@@ -197,8 +210,18 @@ void row_t::remote_write(row_t * src) {
 	while (outstanding_msg_cnt > 0) rpc->run_event_loop_once();
 
 	// Copy to original place.
-	// memcpy(this->data, (void *)resp[0].buf, this->get_tuple_size());
+	memcpy(this->data, src->get_data(), this->get_tuple_size());
 #endif
+}
+
+void row_t::ref(row_t *src) {
+	data_bak = data;
+	data = src->get_data();
+}
+
+void row_t::unref() {
+	data = data_bak;
+	data_bak = NULL;
 }
 
 #if CC_ALG == HLOCK
@@ -214,9 +237,13 @@ void row_t::free_row() {
 	free(data);
 }
 
-RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yield, int coro_id) {
+RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	RC rc = RCOK;
+	if (txn->wound)
+		return Abort;
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
+	if (txn->read_committed)
+		txn->wound = false; // I just read, you don't need to kill me.
 	uint64_t thd_id = txn->get_thd_id();
 	lock_t lt = (type == RD || type == SCAN) ? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
 	txn->lock_ready = false;
@@ -228,22 +255,35 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 	rc = this->manager->lock_get(lt, txn);
 #endif
 
+	if (txn->read_committed && CC_ALG == DLOCK && rc != RCOK) {
+		std::cout << txn->wound << std::endl;
+		assert(rc == RCOK);
+	}
+
 	if (rc == RCOK) {
 	#if INTERACTIVE_MODE == 0
 		if (CC_ALG != DLOCK) {
 			row = this;
-		} else {
-			if (type == WR)
+		} else { // DLOCK w/ one-shot TX mode
+			if (type == WR) {
 				row->copy(this);
+			} else {
+				row->ref(this); // only change the pointer.
+			}
 			row->table = this->get_table();
 			row->set_primary_key(this->get_primary_key());
+			row->index_cnt = this->index_cnt;
 		}
 	#else
 		assert(row != NULL);
 		row->table = this->get_table();
 		row->set_primary_key(this->get_primary_key());
+		row->index_cnt = this->index_cnt;
 		row->copy(this);
 	#endif
+		if (txn->read_committed) {
+			this->manager->lock_release(lt, txn);
+		}
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
 		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
@@ -255,25 +295,13 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		txn->lock_abort = false;
 		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
 		ts_t wait_start = get_sys_clock();
-		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
+		while (!txn->lock_ready && !txn->lock_abort && !txn->wound && !this->is_deleted) {
 #if CC_ALG == WAIT_DIE 
 			continue;
 #elif CC_ALG == WOUND_WAIT
-			// if ((endtime - starttime)/1000 > 10000) {
-			// 	printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
-			// 	this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
-			// 	usleep(100);
-			// 	uint64_t cnt = 0;
-			// 	while (true) cnt += 1;
-			// 	// ASSERT(false);
-			// }
-			if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT) && !m_wl->sim_done)
-				yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 			continue;
 #elif CC_ALG == OLOCK || CC_ALG == DLOCK
 			this->manager->poll_lock_state(txn);
-			if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT) && !m_wl->sim_done)
-				yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 			continue;
 #elif CC_ALG == DL_DETECT
 			uint64_t last_detect = starttime;
@@ -318,28 +346,43 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 		}
 
 		if (txn->lock_ready) {
+			if (txn->read_committed) {
+				this->manager->lock_release(lt, txn);
+			}
 			rc = RCOK;
 		}
-		else if (txn->lock_abort) { 
+		else if (txn->lock_abort || this->is_deleted) {
 			rc = Abort;
-			return_row(type, txn, NULL);
+			if (txn->read_committed) {
+				this->manager->lock_release(lt, txn);
+			} else {
+				return_row(type, txn, NULL);
+			}
 		} else if (txn->wound) {
 		#ifdef DEBUG_WOUND
 			txn->wound_cnt_discovered +=1;
 			// printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);
 		#endif
 			rc = Abort;
-			return_row(type, txn, NULL);
+			if (txn->read_committed) {
+				this->manager->lock_release(lt, txn);
+			} else {
+				return_row(type, txn, NULL);
+			}
 		}
 		endtime = get_sys_clock();
 		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
 	#if INTERACTIVE_MODE == 0
 		if (CC_ALG != DLOCK) {
 			row = this;
-		} else if (rc == RCOK) {
-			if (type == WR)
+		} else if (rc == RCOK) { // DLOCK w/ one-shot mode.
+			if (type == WR) {
 				row->copy(this);
+			} else {
+				row->ref(this);
+			}
 			row->table = this->get_table();
+			row->index_cnt = this->index_cnt;
 			row->set_primary_key(this->get_primary_key());
 		}
 	#else
@@ -347,6 +390,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 			assert(row != NULL);
 			row->table = this->get_table();
 			row->set_primary_key(this->get_primary_key());
+			row->index_cnt = this->index_cnt;
 			row->copy(this);
 		}
 	#endif
@@ -397,160 +441,8 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yiel
 	// like OCC, tictoc also makes a local copy for each read/write
 	row->table = get_table();
 	row->set_primary_key(get_primary_key());
-	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
-	rc = this->manager->access(txn, ts_type, row);
-	return rc;
-#elif CC_ALG == HSTORE || CC_ALG == VLL
-	row = this;
-	return rc;
-#else
-	assert(false);
-#endif
-}
-
-
-RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
-	RC rc = RCOK;
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
-	uint64_t thd_id = txn->get_thd_id();
-	lock_t lt = (type == RD || type == SCAN)? (lock_t)LOCK_SH : (lock_t)LOCK_EX;
-	txn->lock_ready = false;
-#if CC_ALG == DL_DETECT
-	uint64_t * txnids;
-	int txncnt; 
-	rc = this->manager->lock_get(lt, txn, txnids, txncnt);	
-#else
-	rc = this->manager->lock_get(lt, txn);
-#endif
-
-	if (rc == RCOK) {
-		row = this;
-	} else if (rc == Abort) {} 
-	else if (rc == WAIT) {
-		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
-		uint64_t starttime = get_sys_clock();
-#if CC_ALG == DL_DETECT	
-		bool dep_added = false;
-#endif
-		uint64_t endtime;
-		txn->lock_abort = false;
-		INC_STATS(txn->get_thd_id(), wait_cnt, 1);
-		while (!txn->lock_ready && !txn->lock_abort && !txn->wound) {
-#if CC_ALG == WAIT_DIE 
-			continue;
-#elif CC_ALG == WOUND_WAIT
-			// if ((endtime - starttime)/1000 > 10000) {
-			// 	printf("%d (%d, %d) wait for %d (%d, %d) timeout.\n", txn->get_thd_id(), txn->get_ts(), type,
-			// 	this->manager->owners->txn->get_thd_id(), this->manager->owners->txn->get_ts(), this->manager->owners->type);
-			// 	usleep(100);
-			// 	uint64_t cnt = 0;
-			// 	while (true) cnt += 1;
-			// 	// ASSERT(false);
-			// }
-			continue;
-#elif CC_ALG == OLOCK || CC_ALG == DLOCK
-			this->manager->poll_lock_state(txn);
-			continue;
-#elif CC_ALG == DL_DETECT	
-			uint64_t last_detect = starttime;
-			uint64_t last_try = starttime;
-
-			uint64_t now = get_sys_clock();
-			if (now - starttime > g_timeout ) {
-				txn->lock_abort = true;
-				break;
-			}
-			if (g_no_dl) {
-				PAUSE
-				continue;
-			}
-			int ok = 0;
-			if ((now - last_detect > g_dl_loop_detect) && (now - last_try > DL_LOOP_TRIAL)) {
-				if (!dep_added) {
-					ok = dl_detector.add_dep(txn->get_txn_id(), txnids, txncnt, txn->row_cnt);
-					if (ok == 0)
-						dep_added = true;
-					else if (ok == 16)
-						last_try = now;
-				}
-				if (dep_added) {
-					ok = dl_detector.detect_cycle(txn->get_txn_id());
-					if (ok == 16)  // failed to lock the deadlock detector
-						last_try = now;
-					else if (ok == 0) 
-						last_detect = now;
-					else if (ok == 1) {
-						last_detect = now;
-					}
-				}
-			} else 
-				PAUSE
-#endif
-		}
-		if (txn->lock_ready) {
-			rc = RCOK;
-		}
-		else if (txn->lock_abort) { 
-			rc = Abort;
-			return_row(type, txn, NULL);
-		} else if (txn->wound) {
-		#ifdef DEBUG_WOUND
-			txn->wound_cnt_discovered +=1;
-			// printf("%d wounded cnt = %d. \n", (int)txn->get_thd_id(), (int)txn->wound_cnt);
-		#endif
-			rc = Abort;
-			return_row(type, txn, NULL);
-		}
-		endtime = get_sys_clock();
-		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
-		row = this;
-	}
-	return rc;
-#elif CC_ALG == TIMESTAMP || CC_ALG == MVCC || CC_ALG == HEKATON 
-	uint64_t thd_id = txn->get_thd_id();
-	// For TIMESTAMP RD, a new copy of the row will be returned.
-	// for MVCC RD, the version will be returned instead of a copy
-	// So for MVCC RD-WR, the version should be explicitly copied.
-	//row_t * newr = NULL;
-  #if CC_ALG == TIMESTAMP
-	// TODO. should not call malloc for each row read. Only need to call malloc once 
-	// before simulation starts, like TicToc and Silo.
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t), this->get_part_id());
-	txn->cur_row->init(get_table(), this->get_part_id());
-  #endif
-
-	// TODO need to initialize the table/catalog information.
-	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
-	rc = this->manager->access(txn, ts_type, row);
-	if (rc == RCOK ) {
-		row = txn->cur_row;
-	} else if (rc == WAIT) {
-		uint64_t t1 = get_sys_clock();
-		while (!txn->ts_ready)
-			PAUSE
-		uint64_t t2 = get_sys_clock();
-		INC_TMP_STATS(thd_id, time_wait, t2 - t1);
-		row = txn->cur_row;
-	}
-	if (rc != Abort) {
-		row->table = get_table();
-		assert(row->get_schema() == this->get_schema());
-	}
-	return rc;
-#elif CC_ALG == OCC
-	// OCC always make a local copy regardless of read or write, no need for locking.
-	txn->cur_row = (row_t *) mem_allocator.alloc(sizeof(row_t), get_part_id());
-	txn->cur_row->init(get_table(), get_part_id());
-	// access makes a local copy (i.e., cur_row)
-	// The manager is initialized when this row was created
-	rc = this->manager->access(txn, R_REQ);
-	// This is a new copy just made.
-	row = txn->cur_row;
-	return rc;
-#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
-	// like OCC, tictoc also makes a local copy for each read/write
-	row->table = get_table();
-	TsType ts_type = (type == RD)? R_REQ : P_REQ; 
+	row->index_cnt = this->index_cnt;
+	TsType ts_type = (type == RD) ? R_REQ : ((type == RDWR) ? RW_REQ : P_REQ);
 	rc = this->manager->access(txn, ts_type, row);
 	return rc;
 #elif CC_ALG == HSTORE || CC_ALG == VLL
@@ -568,7 +460,9 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 // delete during history cleanup.
 // For TIMESTAMP, the row will be explicity deleted at the end of access().
 // (cf. row_ts.cpp)
-void row_t::return_row(access_t type, txn_man * txn, row_t * row) {	
+void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
+	if (txn->read_committed) // Lock has already been released.
+		return;
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK
 #if INTERACTIVE_MODE == 0
 	assert (row == NULL || row == this || type == XP);
@@ -590,11 +484,13 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 #elif CC_ALG == DLOCK
 	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;
 	if (type == WR && row) {
+		// commit data.
 	#if INTERACTIVE_MODE == 1
 		this->remote_write(row);
 	#else
 		this->copy(row);
 	#endif
+		this->increase_version();
 	}
 	this->manager->lock_release(lt, txn);
 
@@ -632,4 +528,3 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	assert(false);
 #endif
 }
-

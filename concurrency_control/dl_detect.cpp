@@ -53,7 +53,7 @@ DL_detect::nextNode(uint64_t txnid, DetectData * detect_data) {
 		return false;
 	}
 	
-	for(list<uint64_t>::iterator i = dependency[thd].adj.begin(); i != dependency[thd].adj.end(); ++i) {
+	for(std::list<uint64_t>::iterator i = dependency[thd].adj.begin(); i != dependency[thd].adj.end(); ++i) {
 		txnids[n++] = *i;
 	}
 	

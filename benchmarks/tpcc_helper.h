@@ -1,14 +1,32 @@
 #pragma once
 #include "global.h"
 #include "helper.h"
+// ITEM_IDX
+uint64_t itemKey(uint64_t i_id);
+
+// WAREHOUSE_IDX
+uint64_t warehouseKey(uint64_t w_id);
 
 uint64_t distKey(uint64_t d_id, uint64_t d_w_id);
+
 uint64_t custKey(uint64_t c_id, uint64_t c_d_id, uint64_t c_w_id);
-uint64_t orderlineKey(uint64_t w_id, uint64_t d_id, uint64_t o_id);
-uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id);
-// non-primary key
-uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id);
+
+// CUSTOMER_LAST_IDX
+uint64_t custNPKey(uint64_t c_d_id, uint64_t c_w_id, const char* c_last);
+
+// uint64_t orderlineKey(uint64_t w_id, uint64_t d_id, uint64_t o_id);
+// uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id);
+
 uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id);
+// ORDER_IDX
+uint64_t orderKey(int64_t o_id, uint64_t o_d_id, uint64_t o_w_id);
+// ORDER_CUST_IDX
+uint64_t orderCustKey(int64_t o_id, uint64_t o_c_id, uint64_t o_d_id,
+                      uint64_t o_w_id);
+// NEWORDER_IDX
+uint64_t neworderKey(int64_t o_id, uint64_t o_d_id, uint64_t o_w_id);
+// ORDERED_ORDERLINE_IDX
+uint64_t orderlineKey(uint64_t ol_number, int64_t ol_o_id, uint64_t ol_d_id, uint64_t ol_w_id);
 
 uint64_t Lastname(uint64_t num, char* name);
 

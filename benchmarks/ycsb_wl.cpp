@@ -21,7 +21,7 @@ int ycsb_wl::next_tid;
 RC ycsb_wl::init() {
 	workload::init();
 	next_tid = 0;
-	string path = "./benchmarks/YCSB_schema.txt";
+	std::string path = "./benchmarks/YCSB_schema.txt";
 	init_schema( path );
 	
 	init_table_parallel();
@@ -29,7 +29,7 @@ RC ycsb_wl::init() {
 	return RCOK;
 }
 
-RC ycsb_wl::init_schema(string schema_file) {
+RC ycsb_wl::init_schema(std::string schema_file) {
 	workload::init_schema(schema_file);
 	the_table = tables["MAIN_TABLE"]; 	
 	the_index = indexes["MAIN_INDEX"];
@@ -69,18 +69,19 @@ RC ycsb_wl::init_table() {
 				int field_size = schema->get_field_size(fid);
 				char value[field_size];
 				for (int i = 0; i < field_size; i++) 
-					value[i] = (char)rand() % (1<<8) ;
+					value[i] = (char)rand() % (1<<8);
 				new_row->set_value(fid, value);
 			}
-            itemid_t * m_item = 
-                (itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
-			assert(m_item != NULL);
-            m_item->type = DT_row;
-            m_item->location = new_row;
-            m_item->valid = true;
-            uint64_t idx_key = primary_key;
-            rc = the_index->index_insert(idx_key, m_item, part_id);
-            assert(rc == RCOK);
+			index_insert(the_index, primary_key, new_row, part_id);
+            // itemid_t * m_item = 
+            //     (itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
+			// assert(m_item != NULL);
+            // m_item->type = DT_row;
+            // m_item->location = new_row;
+            // m_item->valid = true;
+            // uint64_t idx_key = primary_key;
+            // rc = the_index->index_insert(idx_key, m_item, part_id);
+            // assert(rc == RCOK);
             total_row ++;
         }
     }
@@ -143,16 +144,17 @@ void * ycsb_wl::init_table_slice() {
 		}
 
 		// Item is in the index, row store the actual data.
-		itemid_t * m_item =
-			(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
-		assert(m_item != NULL);
-		m_item->type = DT_row;
-		m_item->location = new_row;
-		m_item->valid = true;
-		uint64_t idx_key = primary_key;
+		index_insert(the_index, primary_key, new_row, part_id);
+		// itemid_t * m_item =
+		// 	(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
+		// assert(m_item != NULL);
+		// m_item->type = DT_row;
+		// m_item->location = new_row;
+		// m_item->valid = true;
+		// uint64_t idx_key = primary_key;
 		
-		rc = the_index->index_insert(idx_key, m_item, part_id);
-		assert(rc == RCOK);
+		// rc = the_index->index_insert(idx_key, m_item, part_id);
+		// assert(rc == RCOK);
 	}
 	return NULL;
 }

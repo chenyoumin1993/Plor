@@ -65,7 +65,7 @@ uint64_t epoch_cnt = 0;
 UInt32 epoch_length = EPOCH_LENGTH;
 #endif
 
-map<string, string> g_params;
+std::map<std::string, std::string> g_params;
 
 #if TPCC_SMALL
 UInt32 g_max_items = 10000;
@@ -74,6 +74,7 @@ UInt32 g_cust_per_dist = 2000;
 UInt32 g_max_items = 100000;
 UInt32 g_cust_per_dist = 3000;
 #endif
+uint64_t g_max_orderline = uint64_t(1) << 32;
 
 // #if PRINT_LAT_DEBUG == 1
 // The 0th thread record this.

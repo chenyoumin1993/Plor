@@ -1,6 +1,8 @@
 #include "global.h"
 #include "helper.h"
 
+using namespace std;
+
 void print_usage() {
 	printf("[usage]:\n");
 	printf("\t-pINT       ; PART_CNT\n");

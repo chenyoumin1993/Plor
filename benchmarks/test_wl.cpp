@@ -8,7 +8,7 @@
 
 RC TestWorkload::init() {
 	workload::init();
-	string path;
+	std::string path;
 	path = "./benchmarks/TEST_schema.txt";
 	init_schema( path.c_str() );
 
@@ -36,14 +36,15 @@ RC TestWorkload::init_table() {
         new_row->set_value(0, rid);
         new_row->set_value(1, 0);
         new_row->set_value(2, 0);
-        itemid_t * m_item = (itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
-		assert(m_item != NULL);
-		m_item->type = DT_row;
-		m_item->location = new_row;
-		m_item->valid = true;
-		uint64_t idx_key = primary_key;
-        rc = the_index->index_insert(idx_key, m_item, 0);
-        assert(rc == RCOK);
+		index_insert(the_index, primary_key, new_row, part_id);
+        // itemid_t * m_item = (itemid_t *) mem_allocator.alloc( sizeof(itemid_t), part_id );
+		// assert(m_item != NULL);
+		// m_item->type = DT_row;
+		// m_item->location = new_row;
+		// m_item->valid = true;
+		// uint64_t idx_key = primary_key;
+        // rc = the_index->index_insert(idx_key, m_item, 0);
+        // assert(rc == RCOK);
     }
 	return rc;
 }

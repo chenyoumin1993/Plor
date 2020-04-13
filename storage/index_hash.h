@@ -48,13 +48,8 @@ public:
 							int part_id=-1, int thd_id=0);
 	
 	RC index_read_multiple(idx_key_t key, itemid_t** items,
-                         size_t& count, int part_id=-1) {
-		(void)key;
-		(void)items;
-		(void)count;
-		assert(false);
-		return ERROR;
-	}
+                         size_t& count, int part_id=-1);
+	
 	RC index_read_range(idx_key_t min_key, idx_key_t max_key,
                       itemid_t** items, size_t& count, int part_id) {
 		(void)min_key;

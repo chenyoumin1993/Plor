@@ -1,13 +1,13 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 16
-#define CC_ALG DLOCK
+#define CORE_CNT 36
+#define CC_ALG WAIT_DIE
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 
 #define CORO_CNT 1
 #define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
@@ -25,9 +25,9 @@
 
 #define BACKOFF_CYCLE 3750
 
-#define VARY_REQ_CNT 0
+#define VARY_REQ_CNT 1
 
-#define INTERACTIVE_MODE 1
+#define INTERACTIVE_MODE 0
 #define N_REPLICAS 1
 
 #define VALVE_ENABLED 0
@@ -36,6 +36,8 @@
 #define VALVE_TP 10000000
 
 #define PERSISTENT_LOG 0
+
+#define TS_OPT 0
 
 // #define DEBUG_WOUND 1
 
@@ -145,7 +147,7 @@
 // Benchmark
 /***********************************************/
 // max number of rows touched per transaction
-#define MAX_ROW_PER_TXN				64
+#define MAX_ROW_PER_TXN				1024
 #define QUERY_INTVL 				1UL
 #define MAX_TXN_PER_PART 			100000
 #define FIRST_PART_LOCAL 			true
@@ -166,9 +168,10 @@
 // Some of the transactions read the data but never use them. 
 // If TPCC_ACCESS_ALL == fales, then these parts of the transactions
 // are not modeled.
-#define TPCC_ACCESS_ALL 			false 
+#define TPCC_ACCESS_ALL 			false
 #define WH_UPDATE					true
-#define NUM_WH 						1// THREAD_CNT
+#define NUM_WH 1
+#define TPCC_NP false
 //
 enum TPCCTxnType {TPCC_ALL, 
 				TPCC_PAYMENT, 

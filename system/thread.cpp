@@ -12,6 +12,10 @@
 #include "tpcc_query.h"
 #include "mem_alloc.h"
 #include "test.h"
+#include "tpcc.h"
+
+#define CONFIG_H "silo/config/config-perf.h"
+#include "../silo/rcu.h"
 
 #if INTERACTIVE_MODE == 1
 #include "rpc.h"
@@ -59,7 +63,7 @@ void thread_t::set_cur_cid(uint64_t cid) {_cur_cid = cid; }
 
 int64_t starttime1, endtime1;
 
-RC thread_t::run(coro_yield_t &yield, int coro_id) {
+RC thread_t::run() {
 #if INTERACTIVE_MODE == 1
 	if (!is_storage_server) {
 		rpc = new erpc::Rpc<erpc::CTransport>(nexus, nullptr, _thd_id, sm_handler);
@@ -179,6 +183,16 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 			}
 #endif
 		}
+
+		m_txn->readonly = m_txn->read_committed = false;
+
+		if (m_query->readonly) {
+			m_txn->readonly = true;
+		}
+		if (m_query->read_committed) {
+			m_txn->read_committed = true;
+		}
+
 		stats._stats[get_thd_id()]->try_cnt += 1;
 		// INC_STATS(_thd_id, time_query, get_sys_clock() - starttime);
 		m_txn->abort_cnt = 0;
@@ -209,18 +223,20 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		if ((CC_ALG == HSTORE && !HSTORE_LOCAL_TS)
 				|| CC_ALG == MVCC 
 				|| CC_ALG == HEKATON
-				|| CC_ALG == TIMESTAMP
-				|| CC_ALG == WAIT_DIE
-				|| CC_ALG == WOUND_WAIT
-				|| CC_ALG == OLOCK
-				|| CC_ALG == DLOCK
-				|| CC_ALG == HLOCK) 
+				|| CC_ALG == TIMESTAMP) 
 			m_txn->set_ts(get_next_ts());
 		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK || CC_ALG == HLOCK) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
+			#if TS_OPT == 0
+				// use old ts.
 				m_txn->set_ts(m_query->timestamp);
+			#else
+				m_txn->set_ts(m_query->timestamp - TS_OPT * m_txn->row_num_last_tx);
+			#endif
 			} else {
+				// New TX, acquire the ts first.
+				m_txn->set_ts(get_next_ts());
 				m_query->timestamp = m_txn->get_ts();
 			}
 			asm volatile ("sfence" ::: "memory");
@@ -245,12 +261,13 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 #endif
 		if (rc == RCOK) 
 		{
+			// scoped_rcu_region guard;
 #if CC_ALG != VLL
 			if (WORKLOAD == TEST) {
 				rc = runTest(m_txn);
 			} else {
 				// starttime1 = get_server_clock();
-				rc = m_txn->run_txn(m_query, yield, coro_id);
+				rc = m_txn->run_txn(m_query);
 				// endtime1 = get_server_clock();
 			}
 #endif
@@ -296,7 +313,9 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 				if (m_query->abort_cnt < 10)
 					m_query->backoff <<= 1;
 				// wait cycles.
-				uint64_t cycles_to_wait = rand_r(&seed) % m_query->backoff;
+				uint64_t cycles_to_wait = (m_query->backoff == 0) ? 0 : rand_r(&seed) % m_query->backoff;
+				if (CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == SILO)
+					cycles_to_wait = (m_query->readonly) ? 100 : cycles_to_wait;
 				// double r;
 				// drand48_r(&buffer, &r);
 				// uint64_t cycles_to_wait = r * m_query->backoff;
@@ -317,12 +336,34 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 		}
 		if (rc == RCOK){
 			m_query->stop_time = get_sys_clock();
-			if (m_query->abort_cnt >= 0)
-				DIS_STATS(get_thd_id(), lat_dis, ((m_query->stop_time - m_query->start_time) / 1000));
-			if ((m_query->stop_time - m_query->start_time) / 1000 > 0) {
-				DIS_STATS(get_thd_id(), abort_dis, m_query->abort_cnt);
+			DIS_STATS(get_thd_id(), lat_dis[0], ((m_query->stop_time - m_query->start_time) / 1000));
+			DIS_STATS(get_thd_id(), abort_dis[0], m_query->abort_cnt);
+#if WORKLOAD == TPCC
+			switch (((tpcc_query *)m_query)->type) {
+				case TPCC_NEW_ORDER :
+					DIS_STATS(get_thd_id(), lat_dis[1], ((m_query->stop_time - m_query->start_time) / 1000));
+					DIS_STATS(get_thd_id(), abort_dis[1], m_query->abort_cnt);
+					break;
+				case TPCC_PAYMENT :
+					DIS_STATS(get_thd_id(), lat_dis[2], ((m_query->stop_time - m_query->start_time) / 1000));
+					DIS_STATS(get_thd_id(), abort_dis[2], m_query->abort_cnt);
+					break;
+				case TPCC_ORDER_STATUS :
+					DIS_STATS(get_thd_id(), lat_dis[3], ((m_query->stop_time - m_query->start_time) / 1000));
+					DIS_STATS(get_thd_id(), abort_dis[3], m_query->abort_cnt);
+					break;
+				case TPCC_DELIVERY :
+					DIS_STATS(get_thd_id(), lat_dis[4], ((m_query->stop_time - m_query->start_time) / 1000));
+					DIS_STATS(get_thd_id(), abort_dis[4], m_query->abort_cnt);
+					break;
+				case TPCC_STOCK_LEVEL :
+					DIS_STATS(get_thd_id(), lat_dis[5], ((m_query->stop_time - m_query->start_time) / 1000));
+					DIS_STATS(get_thd_id(), abort_dis[5], m_query->abort_cnt);
+					break;
+				default:
+					break;
 			}
-			
+#endif
 			if (m_query->abort_cnt > 0)
 				stats._stats[get_thd_id()]->abort_cnt2 += 1;
 		}
@@ -382,8 +423,8 @@ RC thread_t::run(coro_yield_t &yield, int coro_id) {
 	    if (_wl->sim_done) { 
    		    goto _end;
    		}
-		if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT))
-			yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
+		// if (next_coro[coro_id / CORE_CNT] != (coro_id / CORE_CNT))
+		// 	yield(coro_arr[next_coro[coro_id / CORE_CNT]]);
 	}
 _end:
 	// printf("lock_cnt = %d\n", lock_cnt);

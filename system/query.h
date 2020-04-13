@@ -19,6 +19,9 @@ public:
 	uint64_t abort_cnt = 0;
 	uint64_t exec_time = 0;
 	uint64_t backoff = BACKOFF_CYCLE;
+	bool readonly = false;
+	bool read_committed = false;
+	TPCCTxnType type;
 };
 
 // All the querise for a particular thread.

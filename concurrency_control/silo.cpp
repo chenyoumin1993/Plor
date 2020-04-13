@@ -37,13 +37,13 @@ txn_man::validate_silo()
 	int num_locks = 0;
 	ts_t max_tid = 0;
 	bool done = false;
-	if (_pre_abort) {
+	if (_pre_abort && !read_committed) { // Here, read_committed TXs are read-only TXs.
 		for (int i = 0; i < wr_cnt; i++) {
 			row_t * row = accesses[ write_set[i] ]->orig_row;
 			if (row->manager->get_tid() != accesses[write_set[i]]->tid) {
 				rc = Abort;
 				goto final;
-			}	
+			}
 		}	
 		for (int i = 0; i < row_cnt - wr_cnt; i ++) {
 			Access * access = accesses[ read_set[i] ];
@@ -83,8 +83,8 @@ txn_man::validate_silo()
 						if (row->manager->get_tid() != accesses[write_set[i]]->tid) {
 							rc = Abort;
 							goto final;
-						}	
-					}	
+						}
+					}
 					for (int i = 0; i < row_cnt - wr_cnt; i ++) {
 						Access * access = accesses[ read_set[i] ];
 						if (access->orig_row->manager->get_tid() != accesses[read_set[i]]->tid) {
@@ -110,26 +110,28 @@ txn_man::validate_silo()
 
 	// validate rows in the read set
 	// for repeatable_read, no need to validate the read set.
-	for (int i = 0; i < row_cnt - wr_cnt; i ++) {
-		Access * access = accesses[ read_set[i] ];
-		bool success = access->orig_row->manager->validate(access->tid, false);
-		if (!success) {
-			rc = Abort;
-			goto final;
+	if (!read_committed) {
+		for (int i = 0; i < row_cnt - wr_cnt; i ++) {
+			Access * access = accesses[ read_set[i] ];
+			bool success = access->orig_row->manager->validate(access->tid, false);
+			if (!success) {
+				rc = Abort;
+				goto final;
+			}
+			if (access->tid > max_tid)
+				max_tid = access->tid;
 		}
-		if (access->tid > max_tid)
-			max_tid = access->tid;
-	}
-	// validate rows in the write set
-	for (int i = 0; i < wr_cnt; i++) {
-		Access * access = accesses[ write_set[i] ];
-		bool success = access->orig_row->manager->validate(access->tid, true);
-		if (!success) {
-			rc = Abort;
-			goto final;
+		// validate rows in the write set
+		for (int i = 0; i < wr_cnt; i++) {
+			Access * access = accesses[ write_set[i] ];
+			bool success = access->orig_row->manager->validate(access->tid, true);
+			if (!success) {
+				rc = Abort;
+				goto final;
+			}
+			if (access->tid > max_tid)
+				max_tid = access->tid;
 		}
-		if (access->tid > max_tid)
-			max_tid = access->tid;
 	}
 	if (max_tid > _cur_tid)
 		_cur_tid = max_tid + 1;
@@ -145,7 +147,9 @@ final:
 	} else {
 		// Log first.
 	#if PERSISTENT_LOG == 1
-		log->log_tx_meta(get_txn_id(), wr_cnt);
+		if (!readonly && !read_committed)
+			log->log_tx_meta(get_txn_id(), wr_cnt);
+		
 		for (int i = 0; i < wr_cnt; i++) {
 			log->log_content(accesses[ write_set[i] ]->orig_row->get_primary_key(), 
 				accesses[ write_set[i] ]->orig_row->get_data(), 

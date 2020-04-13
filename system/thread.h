@@ -25,7 +25,7 @@ public:
 	// the following function must be in the form void* (*)(void*)
 	// to run with pthread.
 	// conversion is done within the function.
-	RC 			run(coro_yield_t &yield, int coro_id);
+	RC 			run();
 private:
 	uint64_t 	_host_cid;
 	uint64_t 	_cur_cid;

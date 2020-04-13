@@ -10,126 +10,235 @@ void tpcc_query::init(uint64_t thd_id, workload * h_wl) {
 	double x = (double)(rand() % 100) / 100.0;
 	part_to_access = (uint64_t *) 
 		mem_allocator.alloc(sizeof(uint64_t) * g_part_cnt, thd_id);
-	if (x < g_perc_payment)
-		gen_payment(thd_id);
-	else 
-		gen_new_order(thd_id);
+	// if (x < g_perc_payment)
+	// 	gen_payment(thd_id);
+	// else 
+	// 	gen_new_order(thd_id);
+#if TPCC_NP == false
+	if (x < 0.04)
+    gen_stock_level(thd_id);
+	else if (x < 0.04 + 0.04)
+    gen_delivery(thd_id);
+	else if (x < 0.04 + 0.04 + 0.04)
+    gen_order_status(thd_id);
+	else if (x < 0.04 + 0.04 + 0.04 + 0.43)
+    gen_payment(thd_id);
+  else
+    gen_new_order(thd_id);
+#else
+	if (x < 0.49)
+  	gen_payment(thd_id);
+  else
+  	gen_new_order(thd_id);
+#endif
 }
 
+
 void tpcc_query::gen_payment(uint64_t thd_id) {
-	type = TPCC_PAYMENT;
-	if (FIRST_PART_LOCAL)
-		w_id = thd_id % g_num_wh + 1;
-	else
-		w_id = URand(1, g_num_wh, thd_id % g_num_wh);
-	d_w_id = w_id;
-	uint64_t part_id = wh_to_part(w_id);
-	part_to_access[0] = part_id;
-	part_num = 1;
+  type = TPCC_PAYMENT;
+  tpcc_query_payment& arg = args.payment;
 
-	d_id = URand(1, DIST_PER_WARE, w_id-1);
-	h_amount = URand(1, 5000, w_id-1);
-	int x = URand(1, 100, w_id-1);
-	int y = URand(1, 100, w_id-1);
+  read_committed = false;
+  readonly = false;
 
+  if (FIRST_PART_LOCAL) {
+    if (g_num_wh <= g_thread_cnt)
+      arg.w_id = thd_id % g_num_wh + 1;
+    else {
+      do {
+        arg.w_id = RAND((g_num_wh + g_thread_cnt - 1) / g_thread_cnt, thd_id) *
+                       g_thread_cnt +
+                   thd_id + 1;
+      } while (arg.w_id > g_num_wh);
+      assert((arg.w_id - 1) % g_thread_cnt == thd_id);
+    }
+  } else
+    arg.w_id = URand(1, g_num_wh, thd_id);
+  
+  uint64_t part_id = wh_to_part(arg.w_id);
+  part_to_access[0] = part_id;
+  part_num = 1;
 
-	if(x <= 85) { 
-		// home warehouse
-		c_d_id = d_id;
-		c_w_id = w_id;
-	} else {	
-		// remote warehouse
-		c_d_id = URand(1, DIST_PER_WARE, w_id-1);
-		if(g_num_wh > 1) {
-			while((c_w_id = URand(1, g_num_wh, w_id-1)) == w_id) {}
-			if (wh_to_part(w_id) != wh_to_part(c_w_id)) {
-				part_to_access[1] = wh_to_part(c_w_id);
-				part_num = 2;
-			}
-		} else 
-			c_w_id = w_id;
-	}
-	if(y <= 60) {
-		// by last name
-		by_last_name = true;
-		Lastname(NURand(255,0,999,w_id-1),c_last);
-	} else {
-		// by cust id
-		by_last_name = false;
-		c_id = NURand(1023, 1, g_cust_per_dist,w_id-1);
-	}
+  arg.d_id = URand(1, DIST_PER_WARE, thd_id);
+  arg.h_amount = URand(1, 5000, thd_id);
+  arg.h_date = 2013;
+
+  int x = URand(1, 100, thd_id);
+  int y = URand(1, 100, thd_id);
+  if (x <= 85) {
+    // home warehouse
+    arg.c_d_id = arg.d_id;
+    arg.c_w_id = arg.w_id;
+  } else {
+    // remote warehouse
+    arg.c_d_id = URand(1, DIST_PER_WARE, thd_id);
+    if (g_num_wh > 1) {
+      while ((arg.c_w_id = URand(1, g_num_wh, thd_id)) == arg.w_id) {
+      }
+      if (wh_to_part(arg.w_id) != wh_to_part(arg.c_w_id)) {
+        part_to_access[1] = wh_to_part(arg.c_w_id);
+        part_num = 2;
+      }
+    } else
+      arg.c_w_id = arg.w_id;
+  }
+  if (y <= 60) {
+    // by last name
+    arg.by_last_name = true;
+    Lastname(NURand(255, 0, 999, thd_id), arg.c_last);
+  } else {
+    // by cust id
+    arg.by_last_name = false;
+    arg.c_id = NURand(1023, 1, g_cust_per_dist, thd_id);
+  }
 }
 
 void tpcc_query::gen_new_order(uint64_t thd_id) {
-	type = TPCC_NEW_ORDER;
-	if (FIRST_PART_LOCAL)
-		w_id = thd_id % g_num_wh + 1;
-	else
-		w_id = URand(1, g_num_wh, thd_id % g_num_wh);
-	d_id = URand(1, DIST_PER_WARE, w_id-1);
-	c_id = NURand(1023, 1, g_cust_per_dist, w_id-1);
-	rbk = URand(1, 100, w_id-1);
-	ol_cnt = URand(5, 15, w_id-1);
-	o_entry_d = 2013;
-	items = (Item_no *) _mm_malloc(sizeof(Item_no) * ol_cnt, 64);
-	remote = false;
-	part_to_access[0] = wh_to_part(w_id);
-	part_num = 1;
+  type = TPCC_NEW_ORDER;
+  tpcc_query_new_order& arg = args.new_order;
 
-	for (UInt32 oid = 0; oid < ol_cnt; oid ++) {
-		items[oid].ol_i_id = NURand(8191, 1, g_max_items, w_id-1);
-		UInt32 x = URand(1, 100, w_id-1);
-		if (x > 1 || g_num_wh == 1)
-			items[oid].ol_supply_w_id = w_id;
-		else  {
-			while((items[oid].ol_supply_w_id = URand(1, g_num_wh, w_id-1)) == w_id) {}
-			remote = true;
-		}
-		items[oid].ol_quantity = URand(1, 10, w_id-1);
-	}
-	// Remove duplicate items
-	for (UInt32 i = 0; i < ol_cnt; i ++) {
-		for (UInt32 j = 0; j < i; j++) {
-			if (items[i].ol_i_id == items[j].ol_i_id) {
-				for (UInt32 k = i; k < ol_cnt - 1; k++)
-					items[k] = items[k + 1];
-				ol_cnt --;
-				i--;
-			}
-		}
-	}
-	for (UInt32 i = 0; i < ol_cnt; i ++) 
-		for (UInt32 j = 0; j < i; j++) 
-			assert(items[i].ol_i_id != items[j].ol_i_id);
-	// update part_to_access
-	for (UInt32 i = 0; i < ol_cnt; i ++) {
-		UInt32 j;
-		for (j = 0; j < part_num; j++ ) 
-			if (part_to_access[j] == wh_to_part(items[i].ol_supply_w_id))
-				break;
-		if (j == part_num) // not found! add to it.
-		part_to_access[part_num ++] = wh_to_part( items[i].ol_supply_w_id );
-	}
+  read_committed = false;
+  readonly = false;
+
+  if (FIRST_PART_LOCAL) {
+    if (g_num_wh <= g_thread_cnt)
+      arg.w_id = thd_id % g_num_wh + 1;
+    else {
+      do {
+        arg.w_id = RAND((g_num_wh + g_thread_cnt - 1) / g_thread_cnt, thd_id) *
+                       g_thread_cnt +
+                   thd_id + 1;
+      } while (arg.w_id > g_num_wh);
+      assert((arg.w_id - 1) % g_thread_cnt == thd_id);
+    }
+  } else
+    arg.w_id = URand(1, g_num_wh, thd_id);
+  arg.d_id = URand(1, DIST_PER_WARE, thd_id);
+  arg.c_id = NURand(1023, 1, g_cust_per_dist, thd_id);
+  arg.ol_cnt = URand(5, 15, thd_id);
+  arg.o_entry_d = 2013;
+  arg.items = (Item_no*)mem_allocator.alloc(sizeof(Item_no) * arg.ol_cnt, thd_id);
+  arg.all_local = true;
+  part_to_access[0] = wh_to_part(arg.w_id);
+  part_num = 1;
+
+  for (UInt32 oid = 0; oid < arg.ol_cnt; oid++) {
+    arg.items[oid].ol_i_id = NURand(8191, 1, g_max_items, thd_id);
+    UInt32 x = URand(1, 100, thd_id);
+    if (x > 1 || g_num_wh == 1)
+      arg.items[oid].ol_supply_w_id = arg.w_id;
+    else {
+      while ((arg.items[oid].ol_supply_w_id = URand(1, g_num_wh, thd_id)) ==
+             arg.w_id) {
+      }
+      arg.all_local = false;
+    }
+    arg.items[oid].ol_quantity = URand(1, 10, thd_id);
+  }
+  // Remove duplicate items
+  for (UInt32 i = 0; i < arg.ol_cnt; i++) {
+    for (UInt32 j = 0; j < i; j++) {
+      if (arg.items[i].ol_i_id == arg.items[j].ol_i_id) {
+        for (UInt32 k = i; k < arg.ol_cnt - 1; k++)
+          arg.items[k] = arg.items[k + 1];
+        arg.ol_cnt--;
+        i--;
+      }
+    }
+  }
+  for (UInt32 i = 0; i < arg.ol_cnt; i++)
+    for (UInt32 j = 0; j < i; j++)
+      assert(arg.items[i].ol_i_id != arg.items[j].ol_i_id);
+  // update part_to_access
+  for (UInt32 i = 0; i < arg.ol_cnt; i++) {
+    UInt32 j;
+    for (j = 0; j < part_num; j++)
+      if (part_to_access[j] == wh_to_part(arg.items[i].ol_supply_w_id)) break;
+    if (j == part_num)  // not found! add to it.
+      part_to_access[part_num++] = wh_to_part(arg.items[i].ol_supply_w_id);
+  }
+  // "1% of new order gives wrong itemid"
+  // We cannot do this because DBx1000 cannot distinguish user aborts from conflict aborts.
+  // if (URand(0, 99, thd_id) == 0)
+  //   arg.items[URand(0, arg.ol_cnt - 1, thd_id)].ol_i_id = -1;
 }
 
-void 
-tpcc_query::gen_order_status(uint64_t thd_id) {
-	type = TPCC_ORDER_STATUS;
-	if (FIRST_PART_LOCAL)
-		w_id = thd_id % g_num_wh + 1;
-	else
-		w_id = URand(1, g_num_wh, thd_id % g_num_wh);
-	d_id = URand(1, DIST_PER_WARE, w_id-1);
-	c_w_id = w_id;
-	c_d_id = d_id;
-	int y = URand(1, 100, w_id-1);
-	if(y <= 60) {
-		// by last name
-		by_last_name = true;
-		Lastname(NURand(255,0,999,w_id-1),c_last);
-	} else {
-		// by cust id
-		by_last_name = false;
-		c_id = NURand(1023, 1, g_cust_per_dist, w_id-1);
-	}
+void tpcc_query::gen_order_status(uint64_t thd_id) {
+  type = TPCC_ORDER_STATUS;
+  readonly = false;
+  read_committed = false;
+  tpcc_query_order_status& arg = args.order_status;
+
+  if (FIRST_PART_LOCAL) {
+    if (g_num_wh <= g_thread_cnt)
+      arg.w_id = thd_id % g_num_wh + 1;
+    else {
+      do {
+        arg.w_id = RAND((g_num_wh + g_thread_cnt - 1) / g_thread_cnt, thd_id) *
+                       g_thread_cnt +
+                   thd_id + 1;
+      } while (arg.w_id > g_num_wh);
+      assert((arg.w_id - 1) % g_thread_cnt == thd_id);
+    }
+  } else
+    arg.w_id = URand(1, g_num_wh, thd_id);
+  arg.d_id = URand(1, DIST_PER_WARE, thd_id);
+
+  int y = URand(1, 100, thd_id);
+  if (y <= 60) {
+    // by last name
+    arg.by_last_name = true;
+    Lastname(NURand(255, 0, 999, thd_id), arg.c_last);
+  } else {
+    // by cust id
+    arg.by_last_name = false;
+    arg.c_id = NURand(1023, 1, g_cust_per_dist, thd_id);
+  }
+}
+
+void tpcc_query::gen_stock_level(uint64_t thd_id) {
+  type = TPCC_STOCK_LEVEL;
+  readonly = false;
+  read_committed = true;
+  tpcc_query_stock_level& arg = args.stock_level;
+
+  if (FIRST_PART_LOCAL) {
+    if (g_num_wh <= g_thread_cnt)
+      arg.w_id = thd_id % g_num_wh + 1;
+    else {
+      do {
+        arg.w_id = RAND((g_num_wh + g_thread_cnt - 1) / g_thread_cnt, thd_id) *
+                       g_thread_cnt +
+                   thd_id + 1;
+      } while (arg.w_id > g_num_wh);
+      assert((arg.w_id - 1) % g_thread_cnt == thd_id);
+    }
+  } else
+    arg.w_id = URand(1, g_num_wh, thd_id);
+  arg.d_id = URand(1, DIST_PER_WARE, thd_id);
+  arg.threshold = URand(10, 20, thd_id);
+}
+
+void tpcc_query::gen_delivery(uint64_t thd_id) {
+  type = TPCC_DELIVERY;
+  tpcc_query_delivery& arg = args.delivery;
+
+  read_committed = false;
+  readonly = false;
+
+  if (FIRST_PART_LOCAL) {
+    if (g_num_wh <= g_thread_cnt)
+      arg.w_id = thd_id % g_num_wh + 1;
+    else {
+      do {
+        arg.w_id = RAND((g_num_wh + g_thread_cnt - 1) / g_thread_cnt, thd_id) *
+                       g_thread_cnt +
+                   thd_id + 1;
+      } while (arg.w_id > g_num_wh);
+      assert((arg.w_id - 1) % g_thread_cnt == thd_id);
+    }
+  } else
+    arg.w_id = URand(1, g_num_wh, thd_id);
+  arg.o_carrier_id = URand(1, DIST_PER_WARE, thd_id);
+  arg.ol_delivery_d = 2013;
 }

@@ -22,7 +22,7 @@ class ycsb_wl : public workload {
 public :
 	RC init();
 	RC init_table();
-	RC init_schema(string schema_file);
+	RC init_schema(std::string schema_file);
 	RC get_txn_man(txn_man *& txn_manager, thread_t * h_thd);
 	int key_to_part(uint64_t key);
 	index_base * the_index;
@@ -43,7 +43,7 @@ class ycsb_txn_man : public txn_man
 {
 public:
 	void init(thread_t * h_thd, workload * h_wl, uint64_t part_id); 
-	RC run_txn(base_query * query, coro_yield_t &yield, int coro_id);
+	RC run_txn(base_query * query);
 private:
 	uint64_t row_cnt;
 	ycsb_wl * _wl;

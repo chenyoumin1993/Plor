@@ -1,6 +1,11 @@
 #include "tpcc_helper.h"
+#include <city.h>
 
 drand48_data ** tpcc_buffer;
+
+uint64_t itemKey(uint64_t i_id) { return i_id; }
+
+uint64_t warehouseKey(uint64_t w_id) { return w_id; }
 
 uint64_t distKey(uint64_t d_id, uint64_t d_w_id)  {
 	return d_w_id * DIST_PER_WARE + d_id; 
@@ -10,27 +15,44 @@ uint64_t custKey(uint64_t c_id, uint64_t c_d_id, uint64_t c_w_id) {
 	return (distKey(c_d_id, c_w_id) * g_cust_per_dist + c_id);
 }
 
-uint64_t orderlineKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
-	return distKey(d_id, w_id) * g_cust_per_dist + o_id; 
-}
-
-uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
-	return orderlineKey(w_id, d_id, o_id); 
-}
-
-uint64_t custNPKey(char * c_last, uint64_t c_d_id, uint64_t c_w_id) {
-	uint64_t key = 0;
-	char offset = 'A';
-	for (uint32_t i = 0; i < strlen(c_last); i++) 
-		key = (key << 2) + (c_last[i] - offset);
-	key = key << 3;
-	key += c_w_id * DIST_PER_WARE + c_d_id;
-	return key;
+uint64_t custNPKey(uint64_t c_d_id, uint64_t c_w_id, const char* c_last) {
+  return CityHash64(c_last, strlen(c_last)) * g_num_wh * DIST_PER_WARE +
+         distKey(c_d_id, c_w_id);
 }
 
 uint64_t stockKey(uint64_t s_i_id, uint64_t s_w_id) {
 	return s_w_id * g_max_items + s_i_id;
 }
+
+// uint64_t orderlineKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
+// 	return distKey(d_id, w_id) * g_cust_per_dist + o_id; 
+// }
+uint64_t orderKey(int64_t o_id, uint64_t o_d_id, uint64_t o_w_id) {
+  // Use negative o_id to allow reusing the current index interface.
+  return distKey(o_d_id, o_w_id) * g_max_orderline + (g_max_orderline - o_id);
+}
+
+uint64_t orderCustKey(int64_t o_id, uint64_t o_c_id, uint64_t o_d_id,
+                      uint64_t o_w_id) {
+  // Use negative o_id to allow reusing the current index interface.
+  return distKey(o_d_id, o_w_id) * g_cust_per_dist * g_max_orderline +
+         o_c_id * g_max_orderline + (g_max_orderline - o_id);
+}
+
+uint64_t neworderKey(int64_t o_id, uint64_t o_d_id, uint64_t o_w_id) {
+  return distKey(o_d_id, o_w_id) * g_max_orderline + (g_max_orderline - o_id);
+}
+
+uint64_t orderlineKey(uint64_t ol_number, int64_t ol_o_id, uint64_t ol_d_id,
+                      uint64_t ol_w_id) {
+  // Use negative ol_o_id to allow reusing the current index interface.
+  return distKey(ol_d_id, ol_w_id) * g_max_orderline * 15 +
+         (g_max_orderline - ol_o_id) * 15 + ol_number;
+}
+
+// uint64_t orderPrimaryKey(uint64_t w_id, uint64_t d_id, uint64_t o_id) {
+// 	return orderlineKey(w_id, d_id, o_id); 
+// }
 
 uint64_t Lastname(uint64_t num, char* name) {
   	static const char *n[] =

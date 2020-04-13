@@ -16,11 +16,13 @@ RC workload::init() {
 	return RCOK;
 }
 
-RC workload::init_schema(string schema_file) {
+using namespace std;
+
+RC workload::init_schema(std::string schema_file) {
     assert(sizeof(uint64_t) == 8);
     assert(sizeof(double) == 8);
-	string line;
-	ifstream fin(schema_file);
+	std::string line;
+	std::ifstream fin(schema_file);
     Catalog * schema;
     while (getline(fin, line)) {
 		if (line.compare(0, 6, "TABLE=") == 0) {
@@ -30,7 +32,7 @@ RC workload::init_schema(string schema_file) {
 			getline(fin, line);
 			int col_count = 0;
 			// Read all fields for this table.
-			vector<string> lines;
+			std::vector<string> lines;
 			while (line.length() > 1) {
 				lines.push_back(line);
 				getline(fin, line);
@@ -39,7 +41,7 @@ RC workload::init_schema(string schema_file) {
 			for (UInt32 i = 0; i < lines.size(); i++) {
 				string line = lines[i];
 			    size_t pos = 0;
-				string token;
+				std::string token;
 				int elem_num = 0;
 				int size = 0;
 				string type;
@@ -117,7 +119,7 @@ RC workload::init_schema(string schema_file) {
 
 
 
-void workload::index_insert(string index_name, uint64_t key, row_t * row) {
+void workload::index_insert(std::string index_name, uint64_t key, row_t * row) {
 	assert(false);
 	INDEX * index = (INDEX *) indexes[index_name];
 	index_insert(index, key, row);
@@ -127,6 +129,9 @@ void workload::index_insert(index_base * index, uint64_t key, row_t * row, int64
 	uint64_t pid = part_id;
 	if (part_id == -1)
 		pid = get_part_id(row);
+
+	row->index_cnt = get_index_cnt(index);
+	
 	itemid_t * m_item =
 		(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), pid );
 	m_item->init();
@@ -138,16 +143,22 @@ void workload::index_insert(index_base * index, uint64_t key, row_t * row, int64
 }
 
 int workload::read_row_data(int index_cnt, uint64_t primary_key, void *buf) {
-	itemid_t * item;
+	itemid_t * item = NULL;
 	indexes_[index_cnt]->index_read(primary_key, item, 0, 0); // assume one partition, FIXME.
+	// printf("read %lld, %d\n", primary_key, index_cnt);
+	// assert(item != NULL);
+	if (item == NULL)
+		return 0;
 	row_t * row = ((row_t *)item->location);
 	memcpy(buf, row->get_data(), row->get_tuple_size());
 	return row->get_tuple_size();
 }
 
 void workload::write_row_data(int index_cnt, uint64_t primary_key, int size, void *buf) {
-	itemid_t * item;
+	itemid_t * item = NULL;
 	indexes_[index_cnt]->index_read(primary_key, item, 0, 0); // assume one partition, FIXME.
+	// printf("write %lld, %d\n", primary_key, index_cnt);
+	if (item == NULL) return;
 	row_t * row = ((row_t *)item->location);
 	memcpy(row->get_data(), buf, row->get_tuple_size());
 }
@@ -156,9 +167,13 @@ void workload::insert_row_data(int index_cnt, uint64_t primary_key, int size, vo
 	row_t *row;
 	uint64_t row_id;
 
-	tables_[index_cnt]->get_new_row(row, 0, row_id);
+	tables_[index_2_table_[index_cnt]]->get_new_row(row, 0, row_id);
 
 	row->set_primary_key(primary_key);
+
+	// printf("insert %llu, %d\n", primary_key, index_cnt);
+
+	memcpy(row->get_data(), buf, size);
 
 	itemid_t * m_item =
 		(itemid_t *) mem_allocator.alloc( sizeof(itemid_t), 0);
@@ -173,13 +188,15 @@ void workload::insert_row_data(int index_cnt, uint64_t primary_key, int size, vo
 
 void workload::remove_row_data(int index_cnt, uint64_t primary_key) {
 	// Not implemented.
+	// printf("remove %lld, %d\n", primary_key, index_cnt);
+	indexes_[index_cnt]->index_remove(primary_key, 0);
 	return;
 }
 
-void workload::update_index_accessed(index_base *index) {
+int workload::get_index_cnt(index_base *index) {
 	int i = 0;
 	for (i = 0; i < 32; ++i) 
 		if (indexes_[i] == index)
 			break;
-	cur_index_cnt = i;
+	return i;
 }

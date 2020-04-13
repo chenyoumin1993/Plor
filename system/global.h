@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <cassert>
 #include <stdio.h>
-#include <iostream>
 #include <fstream>
 #include <string.h>
 #include <typeinfo>
@@ -31,7 +30,7 @@
 
 #include <gperftools/profiler.h>
 
-using namespace std;
+// using namespace std;
 
 class mem_alloc;
 class Stats;
@@ -89,7 +88,7 @@ extern ts_t g_dl_loop_detect;
 extern bool g_ts_batch_alloc;
 extern UInt32 g_ts_batch_num;
 
-extern map<string, string> g_params;
+extern std::map<std::string, std::string> g_params;
 
 // YCSB
 extern UInt32 g_cc_alg;
@@ -112,6 +111,7 @@ extern bool g_wh_update;
 extern char * output_file;
 extern UInt32 g_max_items;
 extern UInt32 g_cust_per_dist;
+extern uint64_t g_max_orderline;
 
 // #if PRINT_LAT_DEBUG == 1
 // The 0th thread record this.
@@ -195,11 +195,11 @@ typedef uint64_t idx_key_t; // key id for index
 typedef uint64_t (*func_ptr)(idx_key_t);	// part_id func_ptr(index_key);
 
 /* general concurrency control */
-enum access_t {RD, WR, XP, SCAN};
+enum access_t {RD, WR, RDWR, XP, SCAN};
 /* LOCK */
 enum lock_t {LOCK_EX = 4, LOCK_SH, LOCK_NONE };
 /* TIMESTAMP */
-enum TsType {R_REQ, W_REQ, P_REQ, XP_REQ}; 
+enum TsType {R_REQ, W_REQ, P_REQ, XP_REQ, RW_REQ}; 
 
 
 #define MSG(str, args...) { \

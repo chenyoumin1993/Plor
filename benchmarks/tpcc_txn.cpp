@@ -9,622 +9,988 @@
 #include "index_hash.h"
 #include "index_btree.h"
 #include "tpcc_const.h"
+#include <inttypes.h>
+#include <../silo/rcu.h>
 
 void tpcc_txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	txn_man::init(h_thd, h_wl, thd_id);
 	_wl = (tpcc_wl *) h_wl;
 }
 
-RC tpcc_txn_man::run_txn(base_query * query, coro_yield_t &yield, int coro_id) {
+RC tpcc_txn_man::run_txn(base_query * query) {
 	tpcc_query * m_query = (tpcc_query *) query;
+  RC rc = RCOK;
 	switch (m_query->type) {
 		case TPCC_PAYMENT :
-			return run_payment(m_query); break;
+			rc = run_payment(m_query);
+      if (rc == RCOK) {
+        INC_STATS(get_thd_id(), tpcc_payment_commit, 1);
+      } else {
+        INC_STATS(get_thd_id(), tpcc_payment_abort, 1);
+      }
+      break;
 		case TPCC_NEW_ORDER :
-			return run_new_order(m_query); break;
-/*		case TPCC_ORDER_STATUS :
-			return run_order_status(m_query); break;
+			rc = run_new_order(m_query); 
+      if (rc == RCOK) {
+        abort_cnt = 0;
+        INC_STATS(get_thd_id(), tpcc_new_order_commit, 1);
+      } else {
+        INC_STATS(get_thd_id(), tpcc_new_order_abort, 1);
+      }
+      break;
+		case TPCC_ORDER_STATUS :
+			rc = run_order_status(m_query); 
+      if (rc == RCOK) {
+        INC_STATS(get_thd_id(), tpcc_order_status_commit, 1);
+      } else {
+        INC_STATS(get_thd_id(), tpcc_order_status_abort, 1);
+      }
+      break;
 		case TPCC_DELIVERY :
-			return run_delivery(m_query); break;
+			rc = run_delivery(m_query); 
+      if (rc == RCOK) {
+        INC_STATS(get_thd_id(), tpcc_delivery_commit, 1);
+      } else {
+        INC_STATS(get_thd_id(), tpcc_delivery_abort, 1);
+      }
+      break;
 		case TPCC_STOCK_LEVEL :
-			return run_stock_level(m_query); break;*/
+			rc = run_stock_level(m_query); 
+      if (rc == RCOK) {
+        INC_STATS(get_thd_id(), tpcc_stock_level_commit, 1);
+      } else {
+        INC_STATS(get_thd_id(), tpcc_stock_level_abort, 1);
+      }
+      break;
 		default:
 			assert(false);
 	}
-}
-
-RC tpcc_txn_man::run_payment(tpcc_query * query) {
-	RC rc = RCOK;
-	uint64_t key;
-	itemid_t * item;
-
-	uint64_t w_id = query->w_id;
-    uint64_t c_w_id = query->c_w_id;
-	/*====================================================+
-    	EXEC SQL UPDATE warehouse SET w_ytd = w_ytd + :h_amount
-		WHERE w_id=:w_id;
-	+====================================================*/
-	/*===================================================================+
-		EXEC SQL SELECT w_street_1, w_street_2, w_city, w_state, w_zip, w_name
-		INTO :w_street_1, :w_street_2, :w_city, :w_state, :w_zip, :w_name
-		FROM warehouse
-		WHERE w_id=:w_id;
-	+===================================================================*/
-
-	// TODO for variable length variable (string). Should store the size of 
-	// the variable.
-	key = query->w_id;
-	index_base * index = _wl->i_warehouse;
-	item = index_read(index, key, wh_to_part(w_id));
-	assert(item != NULL);
-	row_t * r_wh = ((row_t *)item->location);
-	row_t * r_wh_local;
-	if (g_wh_update)
-		r_wh_local = get_row(r_wh, WR);
-	else 
-		r_wh_local = get_row(r_wh, RD);
-
-	if (r_wh_local == NULL) {
-		return finish(Abort);
-	}
-	double w_ytd;
-	
-	r_wh_local->get_value(W_YTD, w_ytd);
-	if (g_wh_update) {
-		r_wh_local->set_value(W_YTD, w_ytd + query->h_amount);
-	}
-	char w_name[11];
-	char * tmp_str = r_wh_local->get_value(W_NAME);
-	memcpy(w_name, tmp_str, 10);
-	w_name[10] = '\0';
-	/*=====================================================+
-		EXEC SQL UPDATE district SET d_ytd = d_ytd + :h_amount
-		WHERE d_w_id=:w_id AND d_id=:d_id;
-	+=====================================================*/
-	key = distKey(query->d_id, query->d_w_id);
-	item = index_read(_wl->i_district, key, wh_to_part(w_id));
-	assert(item != NULL);
-	row_t * r_dist = ((row_t *)item->location);
-	row_t * r_dist_local = get_row(r_dist, WR);
-	if (r_dist_local == NULL) {
-		return finish(Abort);
-	}
-
-	double d_ytd;
-	r_dist_local->get_value(D_YTD, d_ytd);
-	r_dist_local->set_value(D_YTD, d_ytd + query->h_amount);
-	char d_name[11];
-	tmp_str = r_dist_local->get_value(D_NAME);
-	memcpy(d_name, tmp_str, 10);
-	d_name[10] = '\0';
-
-	/*====================================================================+
-		EXEC SQL SELECT d_street_1, d_street_2, d_city, d_state, d_zip, d_name
-		INTO :d_street_1, :d_street_2, :d_city, :d_state, :d_zip, :d_name
-		FROM district
-		WHERE d_w_id=:w_id AND d_id=:d_id;
-	+====================================================================*/
-
-	row_t * r_cust;
-	if (query->by_last_name) { 
-		/*==========================================================+
-			EXEC SQL SELECT count(c_id) INTO :namecnt
-			FROM customer
-			WHERE c_last=:c_last AND c_d_id=:c_d_id AND c_w_id=:c_w_id;
-		+==========================================================*/
-		/*==========================================================================+
-			EXEC SQL DECLARE c_byname CURSOR FOR
-			SELECT c_first, c_middle, c_id, c_street_1, c_street_2, c_city, c_state,
-			c_zip, c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_since
-			FROM customer
-			WHERE c_w_id=:c_w_id AND c_d_id=:c_d_id AND c_last=:c_last
-			ORDER BY c_first;
-			EXEC SQL OPEN c_byname;
-		+===========================================================================*/
-
-		uint64_t key = custNPKey(query->c_last, query->c_d_id, query->c_w_id);
-		// XXX: the list is not sorted. But let's assume it's sorted... 
-		// The performance won't be much different.
-		index_base * index = _wl->i_customer_last;
-		item = index_read(index, key, wh_to_part(c_w_id));
-		assert(item != NULL);
-		
-		int cnt = 0;
-		itemid_t * it = item;
-		itemid_t * mid = item;
-		while (it != NULL) {
-			cnt ++;
-			it = it->next;
-			if (cnt % 2 == 0)
-				mid = mid->next;
-		}
-		r_cust = ((row_t *)mid->location);
-		
-		/*============================================================================+
-			for (n=0; n<namecnt/2; n++) {
-				EXEC SQL FETCH c_byname
-				INTO :c_first, :c_middle, :c_id,
-					 :c_street_1, :c_street_2, :c_city, :c_state, :c_zip,
-					 :c_phone, :c_credit, :c_credit_lim, :c_discount, :c_balance, :c_since;
-			}
-			EXEC SQL CLOSE c_byname;
-		+=============================================================================*/
-		// XXX: we don't retrieve all the info, just the tuple we are interested in
-	}
-	else { // search customers by cust_id
-		/*=====================================================================+
-			EXEC SQL SELECT c_first, c_middle, c_last, c_street_1, c_street_2,
-			c_city, c_state, c_zip, c_phone, c_credit, c_credit_lim,
-			c_discount, c_balance, c_since
-			INTO :c_first, :c_middle, :c_last, :c_street_1, :c_street_2,
-			:c_city, :c_state, :c_zip, :c_phone, :c_credit, :c_credit_lim,
-			:c_discount, :c_balance, :c_since
-			FROM customer
-			WHERE c_w_id=:c_w_id AND c_d_id=:c_d_id AND c_id=:c_id;
-		+======================================================================*/
-		key = custKey(query->c_id, query->c_d_id, query->c_w_id);
-		index_base * index = _wl->i_customer_id;
-		item = index_read(index, key, wh_to_part(c_w_id));
-		assert(item != NULL);
-		r_cust = (row_t *) item->location;
-	}
-
-  	/*======================================================================+
-	   	EXEC SQL UPDATE customer SET c_balance = :c_balance, c_data = :c_new_data
-   		WHERE c_w_id = :c_w_id AND c_d_id = :c_d_id AND c_id = :c_id;
-   	+======================================================================*/
-	row_t * r_cust_local = get_row(r_cust, WR);
-	if (r_cust_local == NULL) {
-		return finish(Abort);
-	}
-	double c_balance;
-	double c_ytd_payment;
-	double c_payment_cnt;
-
-	r_cust_local->get_value(C_BALANCE, c_balance);
-	r_cust_local->set_value(C_BALANCE, c_balance - query->h_amount);
-	r_cust_local->get_value(C_YTD_PAYMENT, c_ytd_payment);
-	r_cust_local->set_value(C_YTD_PAYMENT, c_ytd_payment + query->h_amount);
-	r_cust_local->get_value(C_PAYMENT_CNT, c_payment_cnt);
-	r_cust_local->set_value(C_PAYMENT_CNT, c_payment_cnt + 1);
-
-	char * c_credit = r_cust_local->get_value(C_CREDIT);
-
-	if ( strstr(c_credit, "BC") ) {
-	
-		/*=====================================================+
-		    EXEC SQL SELECT c_data
-			INTO :c_data
-			FROM customer
-			WHERE c_w_id=:c_w_id AND c_d_id=:c_d_id AND c_id=:c_id;
-		+=====================================================*/
-//	  	char c_new_data[501];
-//	  	sprintf(c_new_data,"| %4d %2d %4d %2d %4d $%7.2f",
-//	      	c_id, c_d_id, c_w_id, d_id, w_id, query->h_amount);
-//		char * c_data = r_cust->get_value("C_DATA");
-//	  	strncat(c_new_data, c_data, 500 - strlen(c_new_data));
-//		r_cust->set_value("C_DATA", c_new_data);
-			
-	}
-	
-	char h_data[25];
-	strncpy(h_data, w_name, 10);
-	int length = strlen(h_data);
-	if (length > 10) length = 10;
-	strcpy(&h_data[length], "    ");
-	strncpy(&h_data[length + 4], d_name, 10);
-	h_data[length+14] = '\0';
-	/*=============================================================================+
-	  EXEC SQL INSERT INTO
-	  history (h_c_d_id, h_c_w_id, h_c_id, h_d_id, h_w_id, h_date, h_amount, h_data)
-	  VALUES (:c_d_id, :c_w_id, :c_id, :d_id, :w_id, :datetime, :h_amount, :h_data);
-	  +=============================================================================*/
-//	row_t * r_hist;
-//	uint64_t row_id;
-//	_wl->t_history->get_new_row(r_hist, 0, row_id);
-//	r_hist->set_value(H_C_ID, c_id);
-//	r_hist->set_value(H_C_D_ID, c_d_id);
-//	r_hist->set_value(H_C_W_ID, c_w_id);
-//	r_hist->set_value(H_D_ID, d_id);
-//	r_hist->set_value(H_W_ID, w_id);
-//	int64_t date = 2013;		
-//	r_hist->set_value(H_DATE, date);
-//	r_hist->set_value(H_AMOUNT, h_amount);
-#if !TPCC_SMALL
-//	r_hist->set_value(H_DATA, h_data);
-#endif
-//	insert_row(r_hist, _wl->t_history);
-
-	assert( rc == RCOK );
-	return finish(rc);
-}
-
-RC tpcc_txn_man::run_new_order(tpcc_query * query) {
-	RC rc = RCOK;
-	uint64_t key;
-	itemid_t * item;
-	index_base * index;
-	
-	bool remote = query->remote;
-	uint64_t w_id = query->w_id;
-    uint64_t d_id = query->d_id;
-    uint64_t c_id = query->c_id;
-	uint64_t ol_cnt = query->ol_cnt;
-	/*=======================================================================+
-	EXEC SQL SELECT c_discount, c_last, c_credit, w_tax
-		INTO :c_discount, :c_last, :c_credit, :w_tax
-		FROM customer, warehouse
-		WHERE w_id = :w_id AND c_w_id = w_id AND c_d_id = :d_id AND c_id = :c_id;
-	+========================================================================*/
-	key = w_id;
-	index = _wl->i_warehouse; 
-	item = index_read(index, key, wh_to_part(w_id));
-	assert(item != NULL);
-	row_t * r_wh = ((row_t *)item->location);
-	row_t * r_wh_local = get_row(r_wh, RD);
-	if (r_wh_local == NULL) {
-		return finish(Abort);
-	}
-
-
-	double w_tax;
-	r_wh_local->get_value(W_TAX, w_tax); 
-	key = custKey(c_id, d_id, w_id);
-	index = _wl->i_customer_id;
-	item = index_read(index, key, wh_to_part(w_id));
-	assert(item != NULL);
-	row_t * r_cust = (row_t *) item->location;
-	row_t * r_cust_local = get_row(r_cust, RD);
-	if (r_cust_local == NULL) {
-		return finish(Abort); 
-	}
-	uint64_t c_discount;
-	//char * c_last;
-	//char * c_credit;
-	r_cust_local->get_value(C_DISCOUNT, c_discount);
-	//c_last = r_cust_local->get_value(C_LAST);
-	//c_credit = r_cust_local->get_value(C_CREDIT);
- 	
-	/*==================================================+
-	EXEC SQL SELECT d_next_o_id, d_tax
-		INTO :d_next_o_id, :d_tax
-		FROM district WHERE d_id = :d_id AND d_w_id = :w_id;
-	EXEC SQL UPDATE d istrict SET d _next_o_id = :d _next_o_id + 1
-		WH ERE d _id = :d_id AN D d _w _id = :w _id ;
-	+===================================================*/
-	key = distKey(d_id, w_id);
-	item = index_read(_wl->i_district, key, wh_to_part(w_id));
-	assert(item != NULL);
-	row_t * r_dist = ((row_t *)item->location);
-	row_t * r_dist_local = get_row(r_dist, WR);
-	if (r_dist_local == NULL) {
-		return finish(Abort);
-	}
-	//double d_tax;
-	int64_t o_id;
-	//d_tax = *(double *) r_dist_local->get_value(D_TAX);
-	o_id = *(int64_t *) r_dist_local->get_value(D_NEXT_O_ID);
-	o_id ++;
-	r_dist_local->set_value(D_NEXT_O_ID, o_id);
-
-	/*========================================================================================+
-	EXEC SQL INSERT INTO ORDERS (o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_ol_cnt, o_all_local)
-		VALUES (:o_id, :d_id, :w_id, :c_id, :datetime, :o_ol_cnt, :o_all_local);
-	+========================================================================================*/
-//	row_t * r_order;
-//	uint64_t row_id;
-//	_wl->t_order->get_new_row(r_order, 0, row_id);
-//	r_order->set_value(O_ID, o_id);
-//	r_order->set_value(O_C_ID, c_id);
-//	r_order->set_value(O_D_ID, d_id);
-//	r_order->set_value(O_W_ID, w_id);
-//	r_order->set_value(O_ENTRY_D, o_entry_d);
-//	r_order->set_value(O_OL_CNT, ol_cnt);
-//	int64_t all_local = (remote? 0 : 1);
-//	r_order->set_value(O_ALL_LOCAL, all_local);
-//	insert_row(r_order, _wl->t_order);
-	/*=======================================================+
-    EXEC SQL INSERT INTO NEW_ORDER (no_o_id, no_d_id, no_w_id)
-        VALUES (:o_id, :d_id, :w_id);
-    +=======================================================*/
-//	row_t * r_no;
-//	_wl->t_neworder->get_new_row(r_no, 0, row_id);
-//	r_no->set_value(NO_O_ID, o_id);
-//	r_no->set_value(NO_D_ID, d_id);
-//	r_no->set_value(NO_W_ID, w_id);
-//	insert_row(r_no, _wl->t_neworder);
-	for (UInt32 ol_number = 0; ol_number < ol_cnt; ol_number++) {
-
-		uint64_t ol_i_id = query->items[ol_number].ol_i_id;
-		uint64_t ol_supply_w_id = query->items[ol_number].ol_supply_w_id;
-		uint64_t ol_quantity = query->items[ol_number].ol_quantity;
-		/*===========================================+
-		EXEC SQL SELECT i_price, i_name , i_data
-			INTO :i_price, :i_name, :i_data
-			FROM item
-			WHERE i_id = :ol_i_id;
-		+===========================================*/
-		key = ol_i_id;
-		item = index_read(_wl->i_item, key, 0);
-		assert(item != NULL);
-		row_t * r_item = ((row_t *)item->location);
-
-		row_t * r_item_local = get_row(r_item, RD);
-		if (r_item_local == NULL) {
-			return finish(Abort);
-		}
-		int64_t i_price;
-		//char * i_name;
-		//char * i_data;
-		r_item_local->get_value(I_PRICE, i_price);
-		//i_name = r_item_local->get_value(I_NAME);
-		//i_data = r_item_local->get_value(I_DATA);
-
-		/*===================================================================+
-		EXEC SQL SELECT s_quantity, s_data,
-				s_dist_01, s_dist_02, s_dist_03, s_dist_04, s_dist_05,
-				s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10
-			INTO :s_quantity, :s_data,
-				:s_dist_01, :s_dist_02, :s_dist_03, :s_dist_04, :s_dist_05,
-				:s_dist_06, :s_dist_07, :s_dist_08, :s_dist_09, :s_dist_10
-			FROM stock
-			WHERE s_i_id = :ol_i_id AND s_w_id = :ol_supply_w_id;
-		EXEC SQL UPDATE stock SET s_quantity = :s_quantity
-			WHERE s_i_id = :ol_i_id
-			AND s_w_id = :ol_supply_w_id;
-		+===============================================*/
-
-		uint64_t stock_key = stockKey(ol_i_id, ol_supply_w_id);
-		index_base * stock_index = _wl->i_stock;
-		itemid_t * stock_item;
-		index_read(stock_index, stock_key, wh_to_part(ol_supply_w_id), stock_item);
-		assert(item != NULL);
-		row_t * r_stock = ((row_t *)stock_item->location);
-		row_t * r_stock_local = get_row(r_stock, WR);
-		if (r_stock_local == NULL) {
-			return finish(Abort);
-		}
-		
-		// XXX s_dist_xx are not retrieved.
-		UInt64 s_quantity;
-		int64_t s_remote_cnt;
-		s_quantity = *(int64_t *)r_stock_local->get_value(S_QUANTITY);
-#if !TPCC_SMALL
-		int64_t s_ytd;
-		int64_t s_order_cnt;
-		//char * s_data = "test";
-		r_stock_local->get_value(S_YTD, s_ytd);
-		r_stock_local->set_value(S_YTD, s_ytd + ol_quantity);
-		r_stock_local->get_value(S_ORDER_CNT, s_order_cnt);
-		r_stock_local->set_value(S_ORDER_CNT, s_order_cnt + 1);
-		//s_data = r_stock_local->get_value(S_DATA);
-#endif
-		if (remote) {
-			s_remote_cnt = *(int64_t*)r_stock_local->get_value(S_REMOTE_CNT);
-			s_remote_cnt ++;
-			r_stock_local->set_value(S_REMOTE_CNT, &s_remote_cnt);
-		}
-		uint64_t quantity;
-		if (s_quantity > ol_quantity + 10) {
-			quantity = s_quantity - ol_quantity;
-		} else {
-			quantity = s_quantity - ol_quantity + 91;
-		}
-		r_stock_local->set_value(S_QUANTITY, &quantity);
-
-		/*====================================================+
-		EXEC SQL INSERT
-			INTO order_line(ol_o_id, ol_d_id, ol_w_id, ol_number,
-				ol_i_id, ol_supply_w_id,
-				ol_quantity, ol_amount, ol_dist_info)
-			VALUES(:o_id, :d_id, :w_id, :ol_number,
-				:ol_i_id, :ol_supply_w_id,
-				:ol_quantity, :ol_amount, :ol_dist_info);
-		+====================================================*/
-		// XXX district info is not inserted.
-//		row_t * r_ol;
-//		uint64_t row_id;
-//		_wl->t_orderline->get_new_row(r_ol, 0, row_id);
-//		r_ol->set_value(OL_O_ID, &o_id);
-//		r_ol->set_value(OL_D_ID, &d_id);
-//		r_ol->set_value(OL_W_ID, &w_id);
-//		r_ol->set_value(OL_NUMBER, &ol_number);
-//		r_ol->set_value(OL_I_ID, &ol_i_id);
-#if !TPCC_SMALL
-//		int w_tax=1, d_tax=1;
-//		int64_t ol_amount = ol_quantity * i_price * (1 + w_tax + d_tax) * (1 - c_discount);
-//		r_ol->set_value(OL_SUPPLY_W_ID, &ol_supply_w_id);
-//		r_ol->set_value(OL_QUANTITY, &ol_quantity);
-//		r_ol->set_value(OL_AMOUNT, &ol_amount);
-#endif		
-//		insert_row(r_ol, _wl->t_orderline);
-	}
-	assert( rc == RCOK );
-	return finish(rc);
-}
-
-RC 
-tpcc_txn_man::run_order_status(tpcc_query * query) {
-/*	row_t * r_cust;
-	if (query->by_last_name) {
-		// EXEC SQL SELECT count(c_id) INTO :namecnt FROM customer
-		// WHERE c_last=:c_last AND c_d_id=:d_id AND c_w_id=:w_id;
-		// EXEC SQL DECLARE c_name CURSOR FOR SELECT c_balance, c_first, c_middle, c_id
-		// FROM customer
-		// WHERE c_last=:c_last AND c_d_id=:d_id AND c_w_id=:w_id ORDER BY c_first;
-		// EXEC SQL OPEN c_name;
-		// if (namecnt%2) namecnt++; / / Locate midpoint customer for (n=0; n<namecnt/ 2; n++)
-		// {
-		//	   	EXEC SQL FETCH c_name
-		//	   	INTO :c_balance, :c_first, :c_middle, :c_id;
-		// }
-		// EXEC SQL CLOSE c_name;
-
-		uint64_t key = custNPKey(query->c_last, query->c_d_id, query->c_w_id);
-		// XXX: the list is not sorted. But let's assume it's sorted... 
-		// The performance won't be much different.
-		INDEX * index = _wl->i_customer_last;
-		uint64_t thd_id = get_thd_id();
-		itemid_t * item = index_read(index, key, wh_to_part(query->c_w_id));
-		int cnt = 0;
-		itemid_t * it = item;
-		itemid_t * mid = item;
-		while (it != NULL) {
-			cnt ++;
-			it = it->next;
-			if (cnt % 2 == 0)
-				mid = mid->next;
-		}
-		r_cust = ((row_t *)mid->location);
-	} else {
-		// EXEC SQL SELECT c_balance, c_first, c_middle, c_last
-		// INTO :c_balance, :c_first, :c_middle, :c_last
-		// FROM customer
-		// WHERE c_id=:c_id AND c_d_id=:d_id AND c_w_id=:w_id;
-		uint64_t key = custKey(query->c_id, query->c_d_id, query->c_w_id);
-		INDEX * index = _wl->i_customer_id;
-		itemid_t * item = index_read(index, key, wh_to_part(query->c_w_id));
-		r_cust = (row_t *) item->location;
-	}
-#if TPCC_ACCESS_ALL
-
-	row_t * r_cust_local = get_row(r_cust, RD);
-	if (r_cust_local == NULL) {
-		return finish(Abort);
-	}
-	double c_balance;
-	r_cust_local->get_value(C_BALANCE, c_balance);
-	char * c_first = r_cust_local->get_value(C_FIRST);
-	char * c_middle = r_cust_local->get_value(C_MIDDLE);
-	char * c_last = r_cust_local->get_value(C_LAST);
-#endif
-	// EXEC SQL SELECT o_id, o_carrier_id, o_entry_d
-	// INTO :o_id, :o_carrier_id, :entdate FROM orders
-	// ORDER BY o_id DESC;
-	uint64_t key = custKey(query->c_id, query->c_d_id, query->c_w_id);
-	INDEX * index = _wl->i_order;
-	itemid_t * item = index_read(index, key, wh_to_part(query->c_w_id));
-	row_t * r_order = (row_t *) item->location;
-	row_t * r_order_local = get_row(r_order, RD);
-	if (r_order_local == NULL) {
-		assert(false); 
-		return finish(Abort);
-	}
-
-	uint64_t o_id, o_entry_d, o_carrier_id;
-	r_order_local->get_value(O_ID, o_id);
-#if TPCC_ACCESS_ALL
-	r_order_local->get_value(O_ENTRY_D, o_entry_d);
-	r_order_local->get_value(O_CARRIER_ID, o_carrier_id);
-#endif
-#if DEBUG_ASSERT
-	itemid_t * it = item;
-	while (it != NULL && it->next != NULL) {
-		uint64_t o_id_1, o_id_2;
-		((row_t *)it->location)->get_value(O_ID, o_id_1);
-		((row_t *)it->next->location)->get_value(O_ID, o_id_2);
-		assert(o_id_1 > o_id_2);
-	}
-#endif
-
-	// EXEC SQL DECLARE c_line CURSOR FOR SELECT ol_i_id, ol_supply_w_id, ol_quantity,
-	// ol_amount, ol_delivery_d
-	// FROM order_line
-	// WHERE ol_o_id=:o_id AND ol_d_id=:d_id AND ol_w_id=:w_id;
-	// EXEC SQL OPEN c_line;
-	// EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	// i=0;
-	// while (sql_notfound(FALSE)) {
-	// 		i++;
-	//		EXEC SQL FETCH c_line
-	//		INTO :ol_i_id[i], :ol_supply_w_id[i], :ol_quantity[i], :ol_amount[i], :ol_delivery_d[i];
-	// }
-	key = orderlineKey(query->w_id, query->d_id, o_id);
-	index = _wl->i_orderline;
-	item = index_read(index, key, wh_to_part(query->w_id));
-	assert(item != NULL);
-#if TPCC_ACCESS_ALL
-	// TODO the rows are simply read without any locking mechanism
-	while (item != NULL) {
-		row_t * r_orderline = (row_t *) item->location;
-		int64_t ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d;
-		r_orderline->get_value(OL_I_ID, ol_i_id);
-		r_orderline->get_value(OL_SUPPLY_W_ID, ol_supply_w_id);
-		r_orderline->get_value(OL_QUANTITY, ol_quantity);
-		r_orderline->get_value(OL_AMOUNT, ol_amount);
-		r_orderline->get_value(OL_DELIVERY_D, ol_delivery_d);
-		item = item->next;
-	}
-#endif
-
-final:
-	assert( rc == RCOK );
-	return finish(rc)*/
-	return RCOK;
+  return rc;
 }
 
 
-//TODO concurrency for index related operations is not completely supported yet.
-// In correct states may happen with the current code.
+static void FAIL_ON_ABORT() {}
 
-RC 
-tpcc_txn_man::run_delivery(tpcc_query * query) {
-/*
-	// XXX HACK if another delivery txn is running on this warehouse, simply commit.
-	if ( !ATOM_CAS(_wl->delivering[query->w_id], false, true) )
-		return finish(RCOK);
+//////////////////////////////////////////////////////
+// Payment
+//////////////////////////////////////////////////////
 
-	for (int d_id = 1; d_id <= DIST_PER_WARE; d_id++) {
-		uint64_t key = distKey(d_id, query->w_id);
-		INDEX * index = _wl->i_orderline_wd;
-		itemid_t * item = index_read(index, key, wh_to_part(query->w_id));
-		assert(item != NULL);
-		while (item->next != NULL) {
-#if DEBUG_ASSERT
-			uint64_t o_id_1, o_id_2;
-			((row_t *)item->location)->get_value(OL_O_ID, o_id_1);
-			((row_t *)item->next->location)->get_value(OL_O_ID, o_id_2);
-			assert(o_id_1 > o_id_2);
-#endif
-			item = item->next;
-		}
-		uint64_t no_o_id;
-		row_t * r_orderline = (row_t *)item->location;
-		r_orderling->get_value(OL_O_ID, no_o_id);
-		// TODO the orderline row should be removed from the table and indexes.
-		
-		index = _wl->i_order;
-		key = orderPrimaryKey(query->w_id, d_id, no_o_id);
-		itemid_t * item = index_read(index, key, wh_to_part(query->w_id));
-		row_t * r_order = (row_t *)item->location;
-		row_t * r_order_local = get_row(r_order, WR);
-
-		uint64_t o_c_id;
-		r_order_local->get_value(O_C_ID, o_c_id);
-		r_order_local->set_value(O_CARRIER_ID, query->o_carrier_id);
-
-		item = index_read(_wl->i_order_line, orderlineKey(query->w_id, d_id, no_o_id));
-		double sum_ol_amount;
-		double ol_amount;
-		while (item != NULL) {
-			// TODO the row is not locked
-			row_t * r_orderline = (row_t *)item->location;
-			r_orderline->set_value(OL_DELIVERY_D, query->ol_delivery_d);
-			r_orderline->get_value(OL_AMOUNT, ol_amount);
-			sum_ol_amount += ol_amount;
-		}
-		
-		key = custKey(o_c_id, d_id, query->w_id);
-		itemid_t * item = index_read(_wl->i_customer_id, key, wh_to_part(query->w_id));
-		row_t * r_cust = (row_t *)item->location;
-		double c_balance;
-		uint64_t c_delivery_cnt;
-	}
-*/
-	return RCOK;
+row_t* tpcc_txn_man::payment_getWarehouse(uint64_t w_id) {
+  // SELECT W_NAME, W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP FROM WAREHOUSE WHERE W_ID = ?
+  auto index = _wl->i_warehouse;
+  auto key = warehouseKey(w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, g_wh_update ? WR : RD);
 }
 
-RC 
-tpcc_txn_man::run_stock_level(tpcc_query * query) {
-	return RCOK;
+void tpcc_txn_man::payment_updateWarehouseBalance(row_t* row, double h_amount) {
+  // UPDATE WAREHOUSE SET W_YTD = W_YTD + ? WHERE W_ID = ?
+  double w_ytd;
+  row->get_value(W_YTD, w_ytd);
+  if (g_wh_update) row->set_value(W_YTD, w_ytd + h_amount);
+}
+
+row_t* tpcc_txn_man::payment_getDistrict(uint64_t d_w_id, uint64_t d_id) {
+  // SELECT D_NAME, D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP FROM DISTRICT WHERE D_W_ID = ? AND D_ID = ?
+  auto index = _wl->i_district;
+  auto key = distKey(d_id, d_w_id);
+  auto part_id = wh_to_part(d_w_id);
+  return search(index, key, part_id, WR);
+}
+
+void tpcc_txn_man::payment_updateDistrictBalance(row_t* row, double h_amount) {
+  // UPDATE DISTRICT SET D_YTD = D_YTD + ? WHERE D_W_ID  = ? AND D_ID = ?
+  double d_ytd;
+  row->get_value(D_YTD, d_ytd);
+  row->set_value(D_YTD, d_ytd + h_amount);
+}
+
+row_t* tpcc_txn_man::payment_getCustomerByCustomerId(uint64_t w_id,
+                                                     uint64_t d_id,
+                                                     uint64_t c_id) {
+  // SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?
+  auto index = _wl->i_customer_id;
+  auto key = custKey(c_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, WR);
+}
+
+row_t* tpcc_txn_man::payment_getCustomerByLastName(uint64_t w_id, uint64_t d_id,
+                                                   const char* c_last,
+                                                   uint64_t* out_c_id) {
+  // SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_LAST = ? ORDER BY C_FIRST;
+  // XXX: the list is not sorted. But let's assume it's sorted...
+  // The performance won't be much different.
+  auto index = _wl->i_customer_last;
+  auto key = custNPKey(d_id, w_id, c_last);
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[100];
+  size_t count = 100;
+  auto rc = index_read_multiple(index, key, items, count, part_id);
+  if (rc != RCOK) {
+    assert(false);
+    return NULL;
+  }
+  if (count == 0) return NULL;
+  // assert(count != 100);
+
+  auto mid = items[count / 2];
+  auto local = get_row((row_t *)mid->location, WR);
+
+  if (local != NULL) local->get_value(C_ID, *out_c_id);
+
+  // printf("payment_getCustomerByLastName: %" PRIu64 "\n", cnt);
+  return local;
+}
+
+bool tpcc_txn_man::payment_updateCustomer(row_t* row, uint64_t c_id,
+                                          uint64_t c_d_id, uint64_t c_w_id,
+                                          uint64_t d_id, uint64_t w_id,
+                                          double h_amount) {
+  // UPDATE CUSTOMER SET C_BALANCE = ?, C_YTD_PAYMENT = ?, C_PAYMENT_CNT = ?, C_DATA = ? WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?
+  // UPDATE CUSTOMER SET C_BALANCE = ?, C_YTD_PAYMENT = ?, C_PAYMENT_CNT = ? WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?
+  double c_balance;
+  row->get_value(C_BALANCE, c_balance);
+  row->set_value(C_BALANCE, c_balance - h_amount);
+  double c_ytd_payment;
+  row->get_value(C_YTD_PAYMENT, c_ytd_payment);
+  row->set_value(C_YTD_PAYMENT, c_ytd_payment + h_amount);
+  uint64_t c_payment_cnt;
+  row->get_value(C_PAYMENT_CNT, c_payment_cnt);
+  row->set_value(C_PAYMENT_CNT, c_payment_cnt + 1);
+
+  const char* c_credit = row->get_value(C_CREDIT);
+  if (strstr(c_credit, "BC")) {
+    char c_new_data[501];
+    sprintf(c_new_data, "%4d %2d %4d %2d %4d $%7.2f | %c", (int)c_id, (int)c_d_id,
+            (int)c_w_id, (int)d_id, (int)w_id, h_amount, '\0');
+
+    const char* c_data = row->get_value(C_DATA);
+    strncat(c_new_data, c_data, 500 - strlen(c_new_data));
+    row->set_value(C_DATA, c_new_data);
+  }
+  return true;
+}
+
+bool tpcc_txn_man::payment_insertHistory(uint64_t c_id, uint64_t c_d_id,
+                                         uint64_t c_w_id, uint64_t d_id,
+                                         uint64_t w_id, uint64_t h_date,
+                                         double h_amount, const char* h_data) {
+// INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  row_t* row = NULL;
+  uint64_t row_id;
+  auto part_id = wh_to_part(w_id);
+  if (!insert_row(row, _wl->t_history, part_id, row_id)) return false;
+  row->set_primary_key(0);
+  row->set_value(H_C_ID, c_id);
+  row->set_value(H_C_D_ID, c_d_id);
+  row->set_value(H_C_W_ID, c_w_id);
+  row->set_value(H_D_ID, d_id);
+  row->set_value(H_W_ID, w_id);
+  row->set_value(H_DATE, h_date);
+  row->set_value(H_AMOUNT, h_amount);
+  row->set_value(H_DATA, const_cast<char*>(h_data));
+
+  // No index to update.
+  return true;
+}
+
+RC tpcc_txn_man::run_payment(tpcc_query* query) {
+  auto& arg = query->args.payment;
+  auto warehouse = payment_getWarehouse(arg.w_id);
+  if (warehouse == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  }
+
+  // printf("txn=%d, %d-%d\n", get_thd_id(), arg.w_id, arg.d_id);
+
+  payment_updateWarehouseBalance(warehouse, arg.h_amount);
+
+  // auto district = payment_getDistrict(arg.w_id, arg.d_id);
+  // if (district == NULL) {
+  //   FAIL_ON_ABORT();
+  //   return finish(Abort);
+  // };
+
+  // payment_updateDistrictBalance(district, arg.h_amount);
+
+  auto c_id = arg.c_id;
+  row_t* customer;
+  if (!arg.by_last_name)
+    customer = payment_getCustomerByCustomerId(arg.w_id, arg.d_id, arg.c_id);
+  else
+    customer =
+        payment_getCustomerByLastName(arg.w_id, arg.d_id, arg.c_last, &c_id);
+  if (customer == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+
+  if (!payment_updateCustomer(customer, c_id, arg.c_d_id, arg.c_w_id, arg.d_id,
+                              arg.w_id, arg.h_amount)) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  }
+
+  char w_name[11];
+  char* tmp_str = warehouse->get_value(W_NAME);
+  memcpy(w_name, tmp_str, 10);
+  w_name[10] = '\0';
+
+  char d_name[11];
+  // tmp_str = district->get_value(D_NAME);//
+  // memcpy(d_name, tmp_str, 10);//
+  d_name[10] = '\0';
+
+  char h_data[25];
+  strcpy(h_data, w_name);
+  int length = strlen(h_data);
+  strcpy(&h_data[length], "    ");
+  strcpy(&h_data[length + 4], d_name);
+  h_data[length + 14] = '\0';
+
+  if (!payment_insertHistory(c_id, arg.c_d_id, arg.c_w_id, arg.d_id, arg.w_id,
+                             arg.h_date, arg.h_amount, h_data)) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+
+  return finish(RCOK);
+}
+
+//////////////////////////////////////////////////////
+// New Order
+//////////////////////////////////////////////////////
+
+row_t* tpcc_txn_man::new_order_getWarehouseTaxRate(uint64_t w_id) {
+  // SELECT W_TAX FROM WAREHOUSE WHERE W_ID = ?
+  auto index = _wl->i_warehouse;
+  auto key = warehouseKey(w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, RD);
+}
+
+row_t* tpcc_txn_man::new_order_getDistrict(uint64_t d_id, uint64_t d_w_id) {
+  // SELECT D_TAX, D_NEXT_O_ID FROM DISTRICT WHERE D_ID = ? AND D_W_ID = ?
+  auto index = _wl->i_district;
+  auto key = distKey(d_id, d_w_id);
+  auto part_id = wh_to_part(d_w_id);
+  // if (d_id == 1)
+  //   lock_print = true;
+  return search(index, key, part_id, WR);
+}
+
+void tpcc_txn_man::new_order_incrementNextOrderId(row_t* row,
+                                                  int64_t* out_o_id) {
+  // UPDATE DISTRICT SET D_NEXT_O_ID = ? WHERE D_ID = ? AND D_W_ID = ?
+  int64_t o_id;
+  row->get_value(D_NEXT_O_ID, o_id);
+  // printf("%" PRIi64 "\n", o_id);
+  *out_o_id = o_id;
+  o_id++;
+  row->set_value(D_NEXT_O_ID, o_id);
+}
+
+row_t* tpcc_txn_man::new_order_getCustomer(uint64_t w_id, uint64_t d_id,
+                                           uint64_t c_id) {
+  // SELECT C_DISCOUNT, C_LAST, C_CREDIT FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?
+  auto index = _wl->i_customer_id;
+  auto key = custKey(c_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, RD);
+}
+
+bool tpcc_txn_man::new_order_createOrder(int64_t o_id, uint64_t d_id,
+                                         uint64_t w_id, uint64_t c_id,
+                                         uint64_t o_entry_d,
+                                         uint64_t o_carrier_id, uint64_t ol_cnt,
+                                         bool all_local) {
+// INSERT INTO ORDERS (O_ID, O_D_ID, O_W_ID, O_C_ID, O_ENTRY_D, O_CARRIER_ID, O_OL_CNT, O_ALL_LOCAL) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  row_t *row = NULL, *row_cust = NULL;
+  uint64_t row_id;
+  auto part_id = wh_to_part(w_id);
+  if (!insert_row(row, _wl->t_order, part_id, row_id)) return false;
+
+  if (!insert_row(row_cust, _wl->t_order, part_id, row_id)) return false;
+
+  row->set_primary_key(orderKey(o_id, d_id, w_id));
+  row->set_value(O_ID, o_id);
+  row->set_value(O_D_ID, d_id);
+  row->set_value(O_W_ID, w_id);
+  row->set_value(O_C_ID, c_id);
+  row->set_value(O_ENTRY_D, o_entry_d);
+  row->set_value(O_CARRIER_ID, o_carrier_id);
+  row->set_value(O_OL_CNT, ol_cnt);
+  row->set_value(O_ALL_LOCAL, all_local ? uint64_t(1) : uint64_t(0));
+
+  row_cust->set_primary_key(orderCustKey(o_id, c_id, d_id, w_id));
+  memcpy(row_cust->get_data(), row->get_data(), row->get_tuple_size());
+
+// #if TPCC_INSERT_INDEX
+  // printf("new Order o_id=%" PRId64 "\n", o_id);
+  {
+    auto idx = _wl->i_order;
+    auto key = orderKey(o_id, d_id, w_id);
+    if (!insert_idx(idx, key, row, part_id)) {
+      return false;
+    }
+  }
+  {
+    auto idx = _wl->i_order_cust;
+    auto key = orderCustKey(o_id, c_id, d_id, w_id);
+    if (!insert_idx(idx, key, row_cust, part_id)) {
+      return false;
+    }
+  }
+// #endif
+  return true;
+}
+
+bool tpcc_txn_man::new_order_createNewOrder(int64_t o_id, uint64_t d_id,
+                                            uint64_t w_id) {
+// INSERT INTO NEW_ORDER (NO_O_ID, NO_D_ID, NO_W_ID) VALUES (?, ?, ?)
+  row_t* row = NULL;
+  uint64_t row_id;
+  auto part_id = wh_to_part(w_id);
+  if (!insert_row(row, _wl->t_neworder, part_id, row_id)) return false;
+  row->set_primary_key(neworderKey(o_id, d_id, w_id));
+  row->set_value(NO_O_ID, o_id);
+  row->set_value(NO_D_ID, d_id);
+  row->set_value(NO_W_ID, w_id);
+
+// #if TPCC_INSERT_INDEX
+  // printf("new NewOrder o_id=%" PRId64 "\n", o_id);
+  {
+    auto idx = _wl->i_neworder;
+    auto key = neworderKey(o_id, d_id, w_id);
+    if (!insert_idx(idx, key, row, part_id)) return false;
+  }
+// #endif
+  return true;
+}
+
+row_t* tpcc_txn_man::new_order_getItemInfo(uint64_t ol_i_id) {
+  // SELECT I_PRICE, I_NAME, I_DATA FROM ITEM WHERE I_ID = ?
+  auto index = _wl->i_item;
+  auto key = itemKey(ol_i_id);
+  auto part_id = 0;
+  return search(index, key, part_id, RD);
+}
+
+row_t* tpcc_txn_man::new_order_getStockInfo(uint64_t ol_i_id,
+                                            uint64_t ol_supply_w_id) {
+  // SELECT S_QUANTITY, S_DATA, S_YTD, S_ORDER_CNT, S_REMOTE_CNT, S_DIST_%02d FROM STOCK WHERE S_I_ID = ? AND S_W_ID = ?
+  auto index = _wl->i_stock;
+  auto key = stockKey(ol_i_id, ol_supply_w_id);
+  auto part_id = wh_to_part(ol_supply_w_id);
+  return search(index, key, part_id, WR);
+}
+
+void tpcc_txn_man::new_order_updateStock(row_t* row, uint64_t ol_quantity,
+                                         bool remote) {
+  // UPDATE STOCK SET S_QUANTITY = ?, S_YTD = ?, S_ORDER_CNT = ?, S_REMOTE_CNT = ? WHERE S_I_ID = ? AND S_W_ID = ?
+  uint64_t s_quantity;
+  row->get_value(S_QUANTITY, s_quantity);
+  uint64_t s_ytd;
+  uint64_t s_order_cnt;
+  row->get_value(S_YTD, s_ytd);
+  row->set_value(S_YTD, s_ytd + ol_quantity);
+  row->get_value(S_ORDER_CNT, s_order_cnt);
+  row->set_value(S_ORDER_CNT, s_order_cnt + 1);
+  if (remote) {
+    uint64_t s_remote_cnt;
+    row->get_value(S_REMOTE_CNT, s_remote_cnt);
+    row->set_value(S_REMOTE_CNT, s_remote_cnt + 1);
+  }
+  uint64_t quantity;
+  if (s_quantity > ol_quantity + 10)
+    quantity = s_quantity - ol_quantity;
+  else
+    quantity = s_quantity - ol_quantity + 91;
+  row->set_value(S_QUANTITY, quantity);
+}
+
+bool tpcc_txn_man::new_order_createOrderLine(
+    int64_t o_id, uint64_t d_id, uint64_t w_id, uint64_t ol_number,
+    uint64_t ol_i_id, uint64_t ol_supply_w_id, uint64_t ol_delivery_d,
+    uint64_t ol_quantity, double ol_amount, const char* ol_dist_info) {
+// INSERT INTO ORDER_LINE (OL_O_ID, OL_D_ID, OL_W_ID, OL_NUMBER, OL_I_ID, OL_SUPPLY_W_ID, OL_DELIVERY_D, OL_QUANTITY, OL_AMOUNT, OL_DIST_INFO) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  row_t* row = NULL;
+  uint64_t row_id;
+  auto part_id = wh_to_part(w_id);
+  if (!insert_row(row, _wl->t_orderline, part_id, row_id)) {
+    // printf("insert_row.\n");
+    return false;
+  }
+  row->set_primary_key(orderlineKey(ol_number, o_id, d_id, w_id));
+  row->set_value(OL_O_ID, o_id);
+  row->set_value(OL_D_ID, d_id);
+  row->set_value(OL_W_ID, w_id);
+  row->set_value(OL_NUMBER, ol_number);
+  row->set_value(OL_I_ID, ol_i_id);
+  row->set_value(OL_SUPPLY_W_ID, ol_supply_w_id);
+  row->set_value(OL_DELIVERY_D, ol_delivery_d);
+  row->set_value(OL_QUANTITY, ol_quantity);
+  row->set_value(OL_AMOUNT, ol_amount);
+  row->set_value(OL_DIST_INFO, const_cast<char*>(ol_dist_info));
+
+// #if TPCC_INSERT_INDEX
+  {
+    auto idx = _wl->i_orderline;
+    auto key = orderlineKey(ol_number, o_id, d_id, w_id);
+    if (!insert_idx(idx, key, row, part_id)) {
+      // printf("ol_i_id=%d o_id=%d d_id=%d w_id=%d\n", (int)ol_i_id, (int)o_id,
+      //        (int)d_id, (int)w_id);
+      return false;
+    }
+  }
+// #endif
+  return true;
+}
+
+RC tpcc_txn_man::run_new_order(tpcc_query* query) {
+  auto& arg = query->args.new_order;
+
+  row_t* items[15];
+  assert(arg.ol_cnt <= sizeof(items) / sizeof(items[0]));
+  for (uint64_t ol_number = 1; ol_number <= arg.ol_cnt; ol_number++) {
+    items[ol_number - 1] =
+        new_order_getItemInfo(arg.items[ol_number - 1].ol_i_id);
+    // printf("ol_i_id %d\n", (int)arg.items[ol_number - 1].ol_i_id);
+    if (items[ol_number - 1] == NULL) {
+      // FAIL_ON_ABORT();
+      return finish(Abort);
+    };
+  }
+
+  auto warehouse = new_order_getWarehouseTaxRate(arg.w_id);
+  if (warehouse == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+  double w_tax;
+  warehouse->get_value(W_TAX, w_tax);
+
+  // Read-modify-write.
+  auto district = new_order_getDistrict(arg.d_id, arg.w_id);
+  if (district == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+
+  // usleep(1000);
+  // double d_tax;
+  // r_dist_local->get_value(D_TAX, d_tax);
+
+  int64_t o_id = 0;// = __sync_fetch_and_add(&(o_ids[arg.w_id][arg.d_id]), 1);
+  // o_id += 3001;
+  new_order_incrementNextOrderId(district, &o_id);
+
+  auto customer = new_order_getCustomer(arg.w_id, arg.d_id, arg.c_id);
+  if (customer == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+// uint64_t c_discount;
+// customer->get_value(C_DISCOUNT, c_discount);
+
+// #if TPCC_INSERT_ROWS
+  uint64_t o_carrier_id = 0;
+  if (!new_order_createOrder(o_id, arg.d_id, arg.w_id, arg.c_id, arg.o_entry_d,
+                             o_carrier_id, arg.ol_cnt, arg.all_local)) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+
+  if (!new_order_createNewOrder(o_id, arg.d_id, arg.w_id)) {
+    FAIL_ON_ABORT();
+    // printf("new_order_createNewOrder fail.\n");
+    return finish(Abort);
+  };
+// #endif
+
+  for (uint64_t ol_number = 1; ol_number <= arg.ol_cnt; ol_number++) {
+    uint64_t ol_i_id = arg.items[ol_number - 1].ol_i_id;
+    uint64_t ol_supply_w_id = arg.items[ol_number - 1].ol_supply_w_id;
+    uint64_t ol_quantity = arg.items[ol_number - 1].ol_quantity;
+
+    auto stock = new_order_getStockInfo(ol_i_id, ol_supply_w_id);
+    if (stock == NULL) {
+      FAIL_ON_ABORT();
+      // printf("%lld, %lld\n", ol_i_id, ol_supply_w_id);
+      return finish(Abort);
+    };
+    bool remote = ol_supply_w_id != arg.w_id;
+    new_order_updateStock(stock, ol_quantity, remote);
+
+
+// #if TPCC_INSERT_ROWS
+    double i_price;
+    items[ol_number - 1]->get_value(I_PRICE, i_price);
+    double ol_amount = ol_quantity * i_price;
+    assert(arg.d_id >= 1 && arg.d_id <= DIST_PER_WARE);
+    const char* ol_dist_info = stock->get_value(S_DIST_01 + arg.d_id - 1);
+    if (!new_order_createOrderLine(o_id, arg.d_id, arg.w_id, ol_number, ol_i_id,
+                                   ol_supply_w_id, arg.o_entry_d, ol_quantity,
+                                   ol_amount, ol_dist_info)) {
+      FAIL_ON_ABORT();
+      return finish(Abort);
+    };
+// #endif
+  }
+  return finish(RCOK);
+}
+
+//////////////////////////////////////////////////////
+// Order Status
+//////////////////////////////////////////////////////
+
+row_t* tpcc_txn_man::order_status_getCustomerByCustomerId(uint64_t w_id,
+                                                          uint64_t d_id,
+                                                          uint64_t c_id) {
+  // SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_BALANCE FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_ID = ?
+  auto index = _wl->i_customer_id;
+  auto key = custKey(c_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, RD);
+}
+
+row_t* tpcc_txn_man::order_status_getCustomerByLastName(uint64_t w_id,
+                                                        uint64_t d_id,
+                                                        const char* c_last,
+                                                        uint64_t* out_c_id) {
+  // SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_BALANCE FROM CUSTOMER WHERE C_W_ID = ? AND C_D_ID = ? AND C_LAST = ? ORDER BY C_FIRST
+  // XXX: the list is not sorted. But let's assume it's sorted...
+  // The performance won't be much different.
+  auto index = _wl->i_customer_last;
+  auto key = custNPKey(d_id, w_id, c_last);
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[100];
+  size_t count = 100;
+  auto rc = index_read_multiple(index, key, items, count, part_id);
+  if (rc != RCOK) {
+    assert(false);
+    return NULL;
+  }
+  if (count == 0) return NULL;
+  // assert(count != 100);
+
+  auto mid = items[count / 2];
+  auto local = get_row((row_t *)mid->location, RD);
+  if (local != NULL) local->get_value(C_ID, *out_c_id);
+  // printf("order_status_getCustomerByLastName: %" PRIu64 "\n", cnt);
+  return local;
+}
+
+row_t* tpcc_txn_man::order_status_getLastOrder(uint64_t w_id, uint64_t d_id,
+                                               uint64_t c_id) {
+  // SELECT O_ID, O_CARRIER_ID, O_ENTRY_D FROM ORDERS WHERE O_W_ID = ? AND O_D_ID = ? AND O_C_ID = ? ORDER BY O_ID DESC LIMIT 1
+  auto index = _wl->i_order_cust;
+  auto key = orderCustKey(g_max_orderline, c_id, d_id, w_id);
+  auto max_key = orderCustKey(1, c_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[1];
+  uint64_t count = 1;
+
+  auto idx_rc = index_read_range(index, key, max_key, items, count, part_id);
+  if (idx_rc == Abort) return NULL;
+  assert(idx_rc == RCOK);
+
+  // printf("order_status_getLastOrder: %" PRIu64 "\n", count);
+  if (count == 0) {
+    // There must be at least one order per customer.
+    // printf("order_status_getLastOrder: w_id=%PRIu64 d_id=%PRIu64 c_id=%PRIu64 count=%PRIu64\n",
+    //        w_id, d_id, c_id, count);
+    assert(false);
+    return NULL;
+  }
+//   if (count == 0) return NULL;
+
+  auto shared = items[0];
+  auto local = get_row((row_t *)shared->location, RD);
+  if (local == NULL) return NULL;
+  return local;
+}
+
+bool tpcc_txn_man::order_status_getOrderLines(uint64_t w_id, uint64_t d_id,
+                                              int64_t o_id) {
+  // SELECT OL_SUPPLY_W_ID, OL_I_ID, OL_QUANTITY, OL_AMOUNT, OL_DELIVERY_D FROM ORDER_LINE WHERE OL_W_ID = ? AND OL_D_ID = ? AND OL_O_ID = ?
+  auto index = _wl->i_orderline;
+  auto key = orderlineKey(1, o_id, d_id, w_id);
+  auto max_key = orderlineKey(15, o_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[16];
+  uint64_t count = 16;
+
+  auto idx_rc = index_read_range(index, key, max_key, items, count, part_id);
+  if (idx_rc == Abort) return false;
+  assert(idx_rc == RCOK);
+  assert(count != 16);
+
+  for (uint64_t i = 0; i < count; i++) {
+    auto shared = items[i];
+	auto local = get_row((row_t *)shared->location, RD);
+    if (local == NULL) return false;
+
+    // int64_t ol_i_id;
+    // uint64_t ol_supply_w_id, ol_quantity, ol_delivery_d;
+    // double ol_amount;
+    // local->get_value(OL_I_ID, ol_i_id);
+    // local->get_value(OL_SUPPLY_W_ID, ol_supply_w_id);
+    // local->get_value(OL_QUANTITY, ol_quantity);
+    // local->get_value(OL_AMOUNT, ol_amount);
+    // local->get_value(OL_DELIVERY_D, ol_delivery_d);
+    (void)local;
+  }
+
+  // printf("order_status_getOrderLines: w_id=%" PRIu64 " d_id=%" PRIu64
+  //        " o_id=%" PRIu64 " cnt=%" PRIu64 "\n",
+  //        w_id, d_id, o_id, cnt);
+  return true;
+}
+
+RC tpcc_txn_man::run_order_status(tpcc_query* query) {
+// #if TPCC_FULL
+  auto& arg = query->args.order_status;
+
+  auto c_id = arg.c_id;
+  row_t* customer;
+  if (!arg.by_last_name)
+    customer =
+        order_status_getCustomerByCustomerId(arg.w_id, arg.d_id, arg.c_id);
+  else
+    customer = order_status_getCustomerByLastName(arg.w_id, arg.d_id,
+                                                  arg.c_last, &c_id);
+  if (customer == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  };
+
+  auto order = order_status_getLastOrder(arg.w_id, arg.d_id, c_id);
+  if (order != NULL) {
+    int64_t o_id;
+    order->get_value(O_ID, o_id);
+
+    if (!order_status_getOrderLines(arg.w_id, arg.d_id, o_id)) {
+      FAIL_ON_ABORT();
+      return finish(Abort);
+    };
+  }
+// #endif
+
+  return finish(RCOK);
+}
+
+//////////////////////////////////////////////////////
+// Delivery
+//////////////////////////////////////////////////////
+
+inline bool tpcc_txn_man::delivery_getNewOrder_deleteNewOrder(uint64_t d_id,
+                                                       uint64_t w_id,
+                                                       int64_t &out_o_id) {
+  // SELECT NO_O_ID FROM NEW_ORDER WHERE NO_D_ID = ? AND NO_W_ID = ? AND NO_O_ID > -1 LIMIT 1
+  // DELETE FROM NEW_ORDER WHERE NO_D_ID = ? AND NO_W_ID = ? AND NO_O_ID = ?
+
+  auto index = _wl->i_neworder;
+  // TODO: This may cause a match with other district with a negative order ID.  It is safe for now because the lowest order ID is 1, but we should give more gap (or use tuple keys) to avoid accidental matches.
+  auto key = neworderKey(g_max_orderline, d_id, w_id);
+  auto max_key = neworderKey(0, d_id, w_id);  // Use key ">= 0" for "> -1"
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[1];
+  uint64_t count = 1;
+
+  auto idx_rc = index_read_range_rev(index, key, max_key, items, count, part_id);
+  if (idx_rc == Abort) return false;
+  assert(idx_rc == RCOK);
+
+  // printf("delivery_getNewOrder_deleteNewOrder: %" PRIu64 "\n", count);
+  if (count == 0) {
+    // No new order; this is acceptable and we do not need to abort TX.
+    out_o_id = -1;
+    return true;
+  }
+
+  auto shared = items[0];
+  auto local = get_row((row_t *)shared->location, WR);
+  if (local == NULL) return false;
+
+  int64_t o_id;
+  local->get_value(NO_O_ID, o_id);
+  out_o_id = o_id;
+
+  {
+    auto idx = _wl->i_neworder;
+    auto key = neworderKey(o_id, d_id, w_id);
+	if (!remove_idx(idx, key, (row_t *)items[0]->location, part_id)) return false;
+
+	if (!remove_row((row_t *)shared->location)) return false;
+  }
+  return true;
+}
+
+row_t* tpcc_txn_man::delivery_getCId(int64_t no_o_id, uint64_t d_id,
+                                     uint64_t w_id) {
+  // SELECT O_C_ID FROM ORDERS WHERE O_ID = ? AND O_D_ID = ? AND O_W_ID = ?
+  auto index = _wl->i_order;
+  auto key = orderKey(no_o_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+  return search(index, key, part_id, WR);
+}
+
+void tpcc_txn_man::delivery_updateOrders(row_t* row, uint64_t o_carrier_id) {
+  // UPDATE ORDERS SET O_CARRIER_ID = ? WHERE O_ID = ? AND O_D_ID = ? AND O_W_ID = ?
+  row->set_value(O_CARRIER_ID, o_carrier_id);
+}
+
+bool tpcc_txn_man::delivery_updateOrderLine_sumOLAmount(uint64_t o_entry_d,
+                                                        int64_t no_o_id,
+                                                        uint64_t d_id,
+                                                        uint64_t w_id,
+                                                        double* out_ol_total) {
+  // UPDATE ORDER_LINE SET OL_DELIVERY_D = ? WHERE OL_O_ID = ? AND OL_D_ID = ? AND OL_W_ID = ?
+  // SELECT SUM(OL_AMOUNT) FROM ORDER_LINE WHERE OL_O_ID = ? AND OL_D_ID = ? AND OL_W_ID = ?", # no_o_id, d_id, w_id
+  double ol_total = 0.0;
+
+  auto index = _wl->i_orderline;
+  auto key = orderlineKey(1, no_o_id, d_id, w_id);
+  auto max_key = orderlineKey(15, no_o_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+
+  itemid_t* items[16];
+  uint64_t count = 16;
+
+  auto idx_rc = index_read_range(index, key, max_key, items, count, part_id);
+  if (idx_rc != RCOK) return false;
+  assert(count != 16);
+
+  for (uint64_t i = 0; i < count; i++) {
+    auto shared = items[i];
+	auto local = get_row((row_t *)shared->location, WR);
+    if (local == NULL) return false;
+    double ol_amount;
+    local->get_value(OL_AMOUNT, ol_amount);
+    local->set_value(OL_DELIVERY_D, o_entry_d);
+    ol_total += ol_amount;
+  }
+
+  // printf("delivery_updateOrderLine_sumOLAmount: w_id=%" PRIu64 " d_id=%" PRIu64
+  //        " o_id=%" PRIu64 " cnt=%" PRIu64 "\n",
+  //        w_id, d_id, no_o_id, cnt);
+  *out_ol_total = ol_total;
+  return true;
+}
+
+bool tpcc_txn_man::delivery_updateCustomer(double ol_total, uint64_t c_id,
+                                           uint64_t d_id, uint64_t w_id) {
+  // UPDATE CUSTOMER SET C_BALANCE = C_BALANCE + ?, C_DELIVERY_CNT = C_DELIVERY_CNT + 1 WHERE C_ID = ? AND C_D_ID = ? AND C_W_ID = ?
+  auto index = _wl->i_customer_id;
+  auto key = custKey(c_id, d_id, w_id);
+  auto part_id = wh_to_part(w_id);
+  auto row = search(index, key, part_id, WR);
+  if (row == NULL) return false;
+
+  double c_balance;
+  uint64_t c_delivery_cnt;
+  row->get_value(C_BALANCE, c_balance);
+  row->set_value(C_BALANCE, c_balance + ol_total);
+  row->get_value(C_DELIVERY_CNT, c_delivery_cnt);
+  row->set_value(C_DELIVERY_CNT, c_delivery_cnt + 1);
+  return true;
+}
+
+RC tpcc_txn_man::run_delivery(tpcc_query* query) {
+  auto& arg = query->args.delivery;
+  int64_t o_id = 0;
+
+  for (uint64_t d_id = 1; d_id <= DIST_PER_WARE; d_id++)
+  {
+    o_id = 0;
+    if (!delivery_getNewOrder_deleteNewOrder(d_id, arg.w_id, o_id)) {
+      // printf("oops0\n");
+      FAIL_ON_ABORT();
+      // INC_STATS_ALWAYS(get_thd_id(), debug1, 1);
+	//   printf("+++%lld\n", o_id);
+      return finish(Abort);
+    }
+
+    // No new order for this district.
+    if (o_id == -1) {
+      // printf("skipping w_id=%" PRIu64 " d_id=%" PRIu64 " for no new order\n",
+      //        arg.w_id, d_id);
+      continue;
+    }
+
+    auto order = delivery_getCId(o_id, d_id, arg.w_id);
+    if (order == NULL) {
+      // There is no guarantee that we will see a order row even after seeing a related new_order row in this read-write transaction.
+      // printf("oops1\n");
+      FAIL_ON_ABORT();
+      return finish(Abort);
+    }
+    uint64_t c_id;
+    order->get_value(O_C_ID, c_id);
+
+    delivery_updateOrders(order, arg.o_carrier_id);
+
+    double ol_total;
+// #ifndef TPCC_CAVALIA_NO_OL_UPDATE
+    if (!delivery_updateOrderLine_sumOLAmount(arg.ol_delivery_d, o_id, d_id,
+                                              arg.w_id, &ol_total)) {
+      // printf("oops2\n");
+      FAIL_ON_ABORT();
+
+      // INC_STATS_ALWAYS(get_thd_id(), debug2, 1);
+      return finish(Abort);
+    }
+// #else
+//     ol_total = 1.;
+// #endif
+
+    if (!delivery_updateCustomer(ol_total, c_id, d_id, arg.w_id)) {
+      // printf("oops3\n");
+      FAIL_ON_ABORT();
+      // INC_STATS_ALWAYS(get_thd_id(), debug3, 1);
+      return finish(Abort);
+    }
+  }
+
+  auto rc = finish(RCOK);
+// if (rc != RCOK) INC_STATS_ALWAYS(get_thd_id(), debug4, 1);
+  return rc;
+}
+
+//////////////////////////////////////////////////////
+// Stock Level
+//////////////////////////////////////////////////////
+
+row_t* tpcc_txn_man::stock_level_getOId(uint64_t d_w_id, uint64_t d_id) {
+  // SELECT D_NEXT_O_ID FROM DISTRICT WHERE D_W_ID = ? AND D_ID = ?
+  auto index = _wl->i_district;
+  auto key = distKey(d_id, d_w_id);
+  auto part_id = wh_to_part(d_w_id);
+  return search(index, key, part_id, RD);
+}
+
+bool tpcc_txn_man::stock_level_getStockCount(uint64_t ol_w_id, uint64_t ol_d_id,
+                                             int64_t ol_o_id, uint64_t s_w_id,
+                                             uint64_t threshold,
+                                             uint64_t* out_distinct_count) {
+  // SELECT COUNT(DISTINCT(OL_I_ID)) FROM ORDER_LINE, STOCK
+  // WHERE OL_W_ID = ?
+  //   AND OL_D_ID = ?
+  //   AND OL_O_ID < ?
+  //   AND OL_O_ID >= ?
+  //   AND S_W_ID = ?
+  //   AND S_I_ID = OL_I_ID
+  //   AND S_QUANTITY < ?
+
+  // 20 orders * 15 items = 300; use 301 to check any errors.
+  uint64_t ol_i_id_list[301];
+  size_t list_size = 0;
+
+  auto index = _wl->i_orderline;
+  auto key = orderlineKey(1, ol_o_id - 1, ol_d_id, ol_w_id);
+  auto max_key = orderlineKey(15, ol_o_id - 20, ol_d_id, ol_w_id);
+  auto part_id = wh_to_part(ol_w_id);
+
+  itemid_t* items[301];
+  uint64_t count = 301;
+
+  auto idx_rc = index_read_range(index, key, max_key, items, count, part_id);
+  if (idx_rc == Abort) return false;
+  assert(idx_rc == RCOK);
+
+  for (uint64_t i = 0; i < count; i++) {
+    auto orderline_shared = items[i];
+	  auto orderline = get_row((row_t *)orderline_shared->location, RD);
+    if (orderline == NULL) return false;
+
+    uint64_t ol_i_id, ol_supply_w_id;
+    orderline->get_value(OL_SUPPLY_W_ID, ol_supply_w_id);
+    if (ol_supply_w_id != s_w_id) continue;
+
+    orderline->get_value(OL_I_ID, ol_i_id);
+
+    assert(list_size < sizeof(ol_i_id_list) / sizeof(ol_i_id_list[0]));
+    ol_i_id_list[list_size] = ol_i_id;
+    list_size++;
+  }
+  assert(list_size <= 300);
+
+// #ifndef TPCC_FOEDUS_DUPLICATE_ITEM
+  uint64_t distinct_ol_i_id_list[300];
+  uint64_t distinct_ol_i_id_count = 0;
+// #endif
+  uint64_t result = 0;
+  // std::unordered_set<uint64_t> ol_i_id_set(300 * 2);
+
+  for (uint64_t i = 0; i < list_size; i++) {
+    uint64_t ol_i_id = ol_i_id_list[i];
+
+// #ifndef TPCC_FOEDUS_DUPLICATE_ITEM
+    bool duplicate = false;
+    for (uint64_t j = 0; j < distinct_ol_i_id_count; j++)
+      if (distinct_ol_i_id_list[j] == ol_i_id) {
+        duplicate = true;
+        break;
+      }
+    if (duplicate) continue;
+
+    distinct_ol_i_id_list[distinct_ol_i_id_count++] = ol_i_id;
+// #endif
+
+    // auto it = ol_i_id_set.find(ol_i_id);
+    // if (it != ol_i_id_set.end()) continue;
+    // ol_i_id_set.emplace_hint(it, ol_i_id);
+
+    auto key = stockKey(ol_i_id, s_w_id);
+    auto index = _wl->i_stock;
+    auto part_id = wh_to_part(s_w_id);
+	auto row = search(index, key, part_id, RD);
+    if (row == NULL) return false;
+
+    uint64_t s_quantity;
+    row->get_value(S_QUANTITY, s_quantity);
+    if (s_quantity < threshold) result++;
+  }
+
+  // printf("stock_level_getStockCount: w_id=%" PRIu64 " d_id=%" PRIu64
+  //        " o_id=%" PRIu64 " s_w_id=%" PRIu64 " list_size=%" PRIu64
+  //        " distinct_cnt=%" PRIu64 " result=%" PRIu64 "\n",
+  //        ol_w_id, ol_d_id, ol_o_id, s_w_id, list_size, distinct_ol_i_id_count,
+  //        result);
+  *out_distinct_count = result;
+  return true;
+}
+
+RC tpcc_txn_man::run_stock_level(tpcc_query* query) {
+// #if TPCC_FULL
+  auto& arg = query->args.stock_level;
+
+  auto district = stock_level_getOId(arg.w_id, arg.d_id);
+  if (district == NULL) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  }
+  int64_t o_id;
+  district->get_value(D_NEXT_O_ID, o_id);
+
+  // o_id = o_ids[arg.w_id][arg.d_id];
+
+  uint64_t distinct_count;
+  if (!stock_level_getStockCount(arg.w_id, arg.d_id, o_id, arg.w_id,
+                                 arg.threshold, &distinct_count)) {
+    FAIL_ON_ABORT();
+    return finish(Abort);
+  }
+  (void)distinct_count;
+// #endif
+
+  return finish(RCOK);
 }

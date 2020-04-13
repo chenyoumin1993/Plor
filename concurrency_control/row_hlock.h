@@ -27,7 +27,7 @@ struct BitMap {
         uint64_t *val;
         for (uint i = 0; i < alloc_size / 8; ++i) {
             val = (uint64_t *)&arr[i * 8];
-            if (*val != 0)
+            if (*val != 0 && *val != (0x1ull << 63))
                 return false;
         }
         return true;

@@ -54,6 +54,8 @@ public:
 	uint64_t get_row_id() { return _row_id; };
 
 	void copy(row_t * src);
+	void ref(row_t *src);
+	void unref();
 	void remote_write(row_t * src);
 
 	void 		set_primary_key(uint64_t key) { _primary_key = key; };
@@ -77,17 +79,20 @@ public:
 	DECL_GET_VALUE(double);
 	DECL_GET_VALUE(UInt32);
 	DECL_GET_VALUE(SInt32);
+	void get_value_bak(int col_id, int64_t & value);
 
 
-	void set_data(char * data, uint64_t size);
+	void set_data(row_t *, uint64_t size);
 	char * get_data();
 
 	void free_row();
 
 	// for concurrency control. can be lock, timestamp etc.
-	RC get_row(access_t type, txn_man * txn, row_t *& row, coro_yield_t &yield, int coro_id);
 	RC get_row(access_t type, txn_man * txn, row_t *& row);
 	void return_row(access_t type, txn_man * txn, row_t * row);
+
+	void increase_version() { version += 1; }
+	uint64_t get_version() { return version; }
 
   // Mainly used to manage the lock.
   #if (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT)
@@ -115,11 +120,14 @@ public:
   	Row_vll * manager;
   #endif
 	char * data;
+	char * data_bak = NULL;
 	table_t * table;
-	volatile uint8_t			is_deleted;
+	volatile uint8_t			is_deleted = false;
+	int index_cnt = -1;
 private:
 	// primary key should be calculated from the data stored in the row.
 	uint64_t 		_primary_key;
 	uint64_t		_part_id;
 	uint64_t 		_row_id;
+	uint64_t 		version = 0;
 };

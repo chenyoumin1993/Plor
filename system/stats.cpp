@@ -8,7 +8,7 @@
 #define BILLION 1000000000UL
 
 extern workload *m_wl;
-extern thread perf;
+extern std::thread perf;
 extern bool start_perf;
 
 #if INTERACTIVE_MODE == 1
@@ -63,7 +63,7 @@ void Stats::init() {
 	dl_wait_time = 0;
 	deadlock = 0;
 	cycle_detect = 0;
-	perf = thread(&Stats::performance, this);
+	perf = std::thread(&Stats::performance, this);
 }
 
 void Stats::init(uint64_t thread_id) {
@@ -132,8 +132,22 @@ void Stats::print() {
 	double total_time_ts_alloc = 0;
 	double total_latency = 0;
 	double total_time_query = 0;
+
+	uint64_t total_tpcc_payment_commit = 0;
+	uint64_t total_tpcc_new_order_commit = 0;
+	uint64_t total_tpcc_order_status_commit = 0;
+	uint64_t total_tpcc_delivery_commit = 0;
+	uint64_t total_tpcc_stock_level_commit = 0;
+	uint64_t total_tpcc_payment_abort = 0;
+	uint64_t total_tpcc_new_order_abort = 0;
+	uint64_t total_tpcc_order_status_abort = 0;
+	uint64_t total_tpcc_delivery_abort = 0;
+	uint64_t total_tpcc_stock_level_abort = 0;
+
 	int actual_thd_cnt = 0;
 	double rate = 0;
+
+	// printf("\n>>>>>>>>>>>\n");
 	for (uint64_t tid = 0; tid < g_thread_cnt; tid ++) {
 		if (_stats[tid] == NULL) continue;
 		actual_thd_cnt += 1;
@@ -156,6 +170,30 @@ void Stats::print() {
 		total_time_ts_alloc += _stats[tid]->time_ts_alloc;
 		total_latency += _stats[tid]->latency;
 		total_time_query += _stats[tid]->time_query;
+
+		total_tpcc_payment_commit += _stats[tid]->tpcc_payment_commit;
+		total_tpcc_new_order_commit += _stats[tid]->tpcc_new_order_commit;
+		total_tpcc_order_status_commit += _stats[tid]->tpcc_order_status_commit;
+		total_tpcc_delivery_commit += _stats[tid]->tpcc_delivery_commit;
+		total_tpcc_stock_level_commit += _stats[tid]->tpcc_stock_level_commit;
+		total_tpcc_payment_abort += _stats[tid]->tpcc_payment_abort;
+		total_tpcc_new_order_abort += _stats[tid]->tpcc_new_order_abort;
+		total_tpcc_order_status_abort += _stats[tid]->tpcc_order_status_abort;
+		total_tpcc_delivery_abort += _stats[tid]->tpcc_delivery_abort;
+		total_tpcc_stock_level_abort += _stats[tid]->tpcc_stock_level_abort;
+		
+		// printf("%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\n",
+		// _stats[tid]->tpcc_payment_commit,
+		// _stats[tid]->tpcc_new_order_commit,
+		// _stats[tid]->tpcc_order_status_commit,
+		// _stats[tid]->tpcc_delivery_commit,
+		// _stats[tid]->tpcc_stock_level_commit,
+		// _stats[tid]->tpcc_payment_abort,
+		// _stats[tid]->tpcc_new_order_abort,
+		// _stats[tid]->tpcc_order_status_abort,
+		// _stats[tid]->tpcc_delivery_abort,
+		// _stats[tid]->tpcc_stock_level_abort
+		// );
 		
 		/*printf("[tid=%ld] txn_cnt=%ld,abort_cnt=%ld\n", 
 			tid,
@@ -163,6 +201,7 @@ void Stats::print() {
 			_stats[tid]->abort_cnt
 		);*/
 	}
+	// printf("<<<<<<<<<<<\n");
 	FILE * outf;
 	if (output_file != NULL) {
 		outf = fopen(output_file, "w");
@@ -228,53 +267,57 @@ void Stats::print() {
 	// print_dis();
 
 	if (g_prt_lat_distr)
-		print_lat_distr();
+		print_lat_distr(0);
 
+	// printf("\n");
+	// for (int i = 1; i <=5; ++i) {
+	// 	print_lat_distr(i);
+	// 	printf("\n");
+	// }
+
+	// printf("\n");
 	uint64_t try_cnt = 0, abort_cnt1 = 0, abort_cnt2 = 0;
 	for (uint  i = 0; i < g_thread_cnt; ++i) {
 		if (_stats[i] == NULL) continue;
 		try_cnt += _stats[i]->try_cnt;
 		abort_cnt1 += _stats[i]->abort_cnt1;
 		abort_cnt2 += _stats[i]->abort_cnt2;
+		// printf("%lld\t%lld\n", _stats[i]->try_cnt, _stats[i]->abort_cnt1);
 	}
 
 	// printf("%.2f\t%.2f\t", (double)abort_cnt1 / try_cnt, (double)abort_cnt2 / total_txn_cnt);
 	printf("%.2f\t", (double)abort_cnt1 / try_cnt);
+
+	// printf("total_tpcc_payment_commit= %lld\n", total_tpcc_payment_commit);
+	// printf("total_tpcc_new_order_commit= %lld\n", total_tpcc_new_order_commit);
+	// printf("total_tpcc_order_status_commit= %lld\n", total_tpcc_order_status_commit);
+	// printf("total_tpcc_delivery_commit= %lld\n", total_tpcc_delivery_commit);
+	// printf("total_tpcc_stock_level_commit= %lld\n", total_tpcc_stock_level_commit);
+	// printf("total_tpcc_payment_abort= %lld\n", total_tpcc_payment_abort);
+	// printf("total_tpcc_new_order_abort= %lld\n", total_tpcc_new_order_abort);
+	// printf("total_tpcc_order_status_abort= %lld\n", total_tpcc_order_status_abort);
+	// printf("total_tpcc_delivery_abort= %lld\n", total_tpcc_delivery_abort);
+	// printf("total_tpcc_stock_level_abort= %lld\n", total_tpcc_stock_level_abort);
 }
 
-void Stats::print_lat_distr() {
-	// FILE * outf;
-	// if (output_file != NULL) {
-	// 	outf = fopen(output_file, "a");
-	// 	for (UInt32 tid = 0; tid < g_thread_cnt; tid ++) {
-	// 		fprintf(outf, "[all_debug1 thd=%d] ", tid);
-	// 		for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
-	// 			fprintf(outf, "%ld,", _stats[tid]->all_debug1[tnum]);
-	// 		fprintf(outf, "\n[all_debug2 thd=%d] ", tid);
-	// 		for (uint32_t tnum = 0; tnum < _stats[tid]->txn_cnt; tnum ++) 
-	// 			fprintf(outf, "%ld,", _stats[tid]->all_debug2[tnum]);
-	// 		fprintf(outf, "\n");
-	// 	}
-	// 	fclose(outf);
-	// } 
-	uint64_t total_lat_dis[MAX_LAT];
-	double total_cnt = 0;
-	uint64_t debug4 = 0, debug5 = 0, wound1 = 0, wound2= 0, wound3 = 0, wound4 = 4;
+void Stats::print_lat_distr(int off) {
+	uint64_t total_lat_dis[MAX_LAT] = {0};
+	double total_cnt = 0.001;
+
+	uint64_t total_abt_dis[MAX_LAT] = {0};
+	double total_abt = 0.001;
+
+
 	for (uint i = 0; i < g_thread_cnt; ++i) {
 		if (_stats[i] == NULL) continue;
-		debug4 += _stats[i]->debug4;
-		debug5 += _stats[i]->debug5;
-		wound1 += _stats[i]->wound1;
-		wound2 += _stats[i]->wound2;
-		wound3 += _stats[i]->wound3;
-		wound4 += _stats[i]->wound4;
 		for (int j = 0; j < MAX_LAT; ++j) {
-			total_lat_dis[j] += _stats[i]->lat_dis[j];
-			total_cnt += (double)_stats[i]->lat_dis[j];
+			total_lat_dis[j] += _stats[i]->lat_dis[off][j];
+			total_cnt += (double)_stats[i]->lat_dis[off][j];
+
+			total_abt_dis[j] += _stats[i]->abort_dis[off][j];
+			total_abt += (double)_stats[i]->abort_dis[off][j];
 		}
 	}
-	// printf("debug4 = %d, debug5 = %d, wound1 = %d, wound2 = %d, wound3 = %d, wound4 = %d\n", 
-	// debug4, debug5, wound1, wound2, wound3, wound4);
 
 	double tmp_cnt = 0;
 	bool p_50 = false, /*p_90 = false, p_95 = false,*/ p_99 = false, p_999 = false, p_max = false;
@@ -303,16 +346,6 @@ void Stats::print_lat_distr() {
 		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
 			printf ("%d\t", i);
 			p_max = true;
-		}
-	}
-	// printf("|\t");
-	uint64_t total_abt_dis[MAX_LAT];
-	double total_abt = 0;
-	for (uint i = 0; i < g_thread_cnt; ++i) {
-		if (_stats[i] == NULL) continue;
-		for (int j = 0; j < MAX_LAT; ++j) {
-			total_abt_dis[j] += _stats[i]->abort_dis[j];
-			total_abt += (double)_stats[i]->abort_dis[j];
 		}
 	}
 
@@ -350,8 +383,6 @@ void Stats::print_lat_distr() {
 			p_max = true;
 		} 
 	}
-
-	// printf("|\t");
 }
 
 

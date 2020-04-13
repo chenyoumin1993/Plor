@@ -16,6 +16,8 @@
 #include "vll.h"
 #include "coro.h"
 
+#include "tpcc_const.h"
+
 void * f(void *);
 void exec(coro_yield_t &yield, int coro_id);
 
@@ -31,7 +33,7 @@ pthread_t e;
 thread_t ** m_thds;
 
 workload * m_wl;
-thread perf;
+std::thread perf;
 bool start_perf = false;
 
 #if INTERACTIVE_MODE == 1
@@ -116,6 +118,7 @@ int main(int argc, char* argv[])
 			assert(false);
 	}
 	m_wl->init();
+
 	// printf("workload initialized!\n");
 	
 	uint64_t thd_cnt = g_thread_cnt;
@@ -240,7 +243,7 @@ void * f(void * id) {
 
 void exec(coro_yield_t &yield, int coro_id) {
 	// First, just whether I'm a storage server, only valid in interactive mode.
-	m_thds[coro_id]->run(yield, coro_id);
+	m_thds[coro_id]->run();
 }
 
 #if PENALTY_POLICY == 2
@@ -258,10 +261,11 @@ void read_handler(erpc::ReqHandle *req_handle, void *) {
 	auto &resp = req_handle->pre_resp_msgbuf;
 	// Process the requests.
 	ReadRowRequest *r = reinterpret_cast<ReadRowRequest *>(req->buf);
+
+	assert(r->index_cnt != -1);
 	// printf("read request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
 	rpc->resize_msg_buffer(&resp, MAX_TUPLE_SIZE);
 	int tuple_size = m_wl->read_row_data(r->index_cnt, r->primary_key, reinterpret_cast<void *>(resp.buf));
-
 	// Send response message.
 	rpc->resize_msg_buffer(&resp, tuple_size);
 	// sprintf(reinterpret_cast<char *>(resp.buf), "hello");
@@ -274,6 +278,8 @@ void write_handler(erpc::ReqHandle *req_handle, void *) {
 	
 	// Process the requests.
 	WriteRowRequest *r = reinterpret_cast<WriteRowRequest *>(req->buf);
+
+	assert(r->index_cnt != -1);
 	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
 	m_wl->write_row_data(r->index_cnt, r->primary_key, r->size, reinterpret_cast<void *>(r->buf));
 
@@ -288,6 +294,8 @@ void insert_handler(erpc::ReqHandle *req_handle, void *) {
 	
 	// Process the requests.
 	InsertRowRequest *r = reinterpret_cast<InsertRowRequest *>(req->buf);
+
+	assert(r->index_cnt != -1);
 	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
 	m_wl->insert_row_data(r->index_cnt, r->primary_key, r->size, reinterpret_cast<void *>(r->buf));
 
@@ -302,6 +310,8 @@ void remove_handler(erpc::ReqHandle *req_handle, void *) {
 	
 	// Process the requests.
 	RemoveRowRequest *r = reinterpret_cast<RemoveRowRequest *>(req->buf);
+
+	assert(r->index_cnt != -1);
 	// printf("write request [%d] (index = %d, key = %lld)\n", req->get_data_size(), r->index_cnt, r->primary_key);
 	m_wl->remove_row_data(r->index_cnt, r->primary_key);
 

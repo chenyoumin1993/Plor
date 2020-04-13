@@ -8,6 +8,7 @@
  ********************************/
 
 #include <city.h>
+#include <mutex>
 
 struct OLockEntry {
 	txn_man *txn;
@@ -35,7 +36,7 @@ struct Owner {
 
 struct __attribute__((packed)) Owner {
     union {
-        txn_man *_owner;
+        uint64_t _owner;
         struct {
         	uint8_t tid;
         	union {
@@ -71,7 +72,7 @@ struct BitMap {
         uint64_t *val;
         for (uint i = 0; i < alloc_size / 8; ++i) {
             val = (uint64_t *)&arr[i * 8];
-            if (*val != 0)
+            if (*val != 0 && *val != (0x1ull << 63))
                 return false;
         }
         return true;
@@ -400,6 +401,12 @@ public:
     void poll_lock_state(txn_man *txn);
 
     RC validate(txn_man *txn);
+    // int path = 0;
+
+    // std::mutex mtx;
+    // bool do_print;
+
+    int cnt = 0;
 
 private:
     // ...

@@ -45,7 +45,7 @@ RC IndexHash::index_insert(idx_key_t key, itemid_t * item, int part_id) {
 	BucketHeader * cur_bkt = &_buckets[part_id][bkt_idx];
 	// 1. get the ex latch
 	get_latch(cur_bkt);
-	
+		
 	// 2. update the latch list
 	cur_bkt->insert_item(key, item, part_id);
 	
@@ -65,7 +65,6 @@ RC IndexHash::index_read(idx_key_t key, itemid_t * &item, int part_id) {
 	// 3. release the latch
 //	release_latch(cur_bkt);
 	return rc;
-
 }
 
 RC IndexHash::index_read(idx_key_t key, itemid_t * &item, 
@@ -79,7 +78,30 @@ RC IndexHash::index_read(idx_key_t key, itemid_t * &item,
 	cur_bkt->read_item(key, item, table->get_table_name());
 	// 3. release the latch
 //	release_latch(cur_bkt);
+	if (key == 772540560715020235)
+		printf("index_hash: row = %p\n", item->location);
 	return rc;
+}
+
+RC IndexHash::index_read_multiple(idx_key_t key, itemid_t** items, size_t& count,
+                         int part_id) {
+  uint64_t bkt_idx = hash(key);
+  assert(bkt_idx < _bucket_cnt_per_part);
+  BucketHeader* cur_bkt = &_buckets[part_id][bkt_idx];
+  RC rc = RCOK;
+  // 1. get the sh latch
+  //	get_latch(cur_bkt);
+  itemid_t* m_item;
+  cur_bkt->read_item(key, m_item, table->get_table_name());
+  size_t i = 0;
+  while (m_item != NULL && i < count) {
+    items[i++] = m_item;
+    m_item = m_item->next;
+  }
+  count = i;
+  // 3. release the latch
+  //	release_latch(cur_bkt);
+  return rc;
 }
 
 /************** BucketHeader Operations ******************/

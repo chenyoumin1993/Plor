@@ -1,4 +1,4 @@
-// #define CONFIG_H "config/config-perf.h"
+#define CONFIG_H "config/config-perf.h"
 
 #define NDB_MASSTREE 1
 #include "masstree/config.h"
@@ -26,7 +26,7 @@ struct mbtree_params : public Masstree::nodeparams<> {
   typedef itemid_t* value_type;
   typedef Masstree::value_print<value_type> value_print_type;
   typedef simple_threadinfo threadinfo_type;
-  enum { RcuRespCaller = true };
+  enum { RcuRespCaller = false };
 };
 
 typedef mbtree<mbtree_params> concurrent_mbtree;
@@ -52,10 +52,11 @@ class IndexMBTree_cb
               concurrent_mbtree::value_type v,
               const concurrent_mbtree::node_opaque_t* n,
               uint64_t version) override {
-    (void)k;
+    // (void)k;
     (void)n;
     (void)version;
     items_[i_++] = v;
+    // std::cout << "k: " << k << ", v: " << v << std::endl;
     return i_ < count_;
   }
 
@@ -99,7 +100,6 @@ RC IndexMBTree::index_insert(idx_key_t key, itemid_t* item,
 
   concurrent_mbtree::insert_info_t insert_info;
   if (!idx->insert_if_absent(mbtree_key, item, &insert_info)) return ERROR;
-
 
   auto it = node_map.find((void*)insert_info.node);
 

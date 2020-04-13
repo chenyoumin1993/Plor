@@ -27,11 +27,26 @@ public:
 	uint64_t wound3;
 	uint64_t wound4;
 
-	uint64_t lat_dis[MAX_LAT]; // us
+	uint64_t tpcc_payment_commit;
+	uint64_t tpcc_new_order_commit;
+	uint64_t tpcc_order_status_commit;
+	uint64_t tpcc_delivery_commit;
+	uint64_t tpcc_stock_level_commit;
+	uint64_t tpcc_payment_abort;
+	uint64_t tpcc_new_order_abort;
+	uint64_t tpcc_order_status_abort;
+	uint64_t tpcc_delivery_abort;
+	uint64_t tpcc_stock_level_abort;
+
+	// uint64_t lat_dis[MAX_LAT]; // us
+	// uint64_t abort_dis[1000];
 	uint64_t abort_cnt1;
 	uint64_t abort_cnt2;
 	uint64_t try_cnt;
-	uint64_t abort_dis[MAX_LAT];
+
+	uint64_t lat_dis[6][MAX_LAT];
+
+	uint64_t abort_dis[6][MAX_LAT];
 	
 	uint64_t latency;
 	uint64_t * all_debug1;
@@ -70,6 +85,6 @@ public:
 	void commit(uint64_t thd_id);
 	void abort(uint64_t thd_id);
 	void print();
-	void print_lat_distr();
+	void print_lat_distr(int);
 	void performance();
 };

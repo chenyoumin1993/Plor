@@ -29,7 +29,7 @@ public:
 #if CC_ALG == TICTOC
 	ts_t 		wts;
 	ts_t 		rts;
-#elif (CC_ALG == SILO || CC_ALG == HLOCK)
+#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == DLOCK)
 	ts_t 		tid;
 	ts_t 		epoch;
 #elif CC_ALG == HEKATON
@@ -49,7 +49,7 @@ public:
 	uint64_t abort_cnt;
 	persistent_log *log;
 
-	virtual RC 		run_txn(base_query * m_query, coro_yield_t &yield, int coro_id) = 0;
+	virtual RC 		run_txn(base_query * m_query) = 0;
 	uint64_t 		get_thd_id();
 	workload * 		get_wl();
 	void 			set_txn_id(txnid_t txn_id);
@@ -87,6 +87,8 @@ public:
 	bool wound = false;
 	bool waiting = false;
 	bool ex_mode = false;
+	bool readonly = false;
+	bool read_committed = false;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
 	int wound_cnt_discovered = 0;
@@ -95,6 +97,8 @@ public:
 	int cur_owner_id = 0;
 	int lock_cnt = 0;
 #endif
+
+	int row_num_last_tx = 0;
 	
 	// For OCC
 	uint64_t 		start_ts;
@@ -102,6 +106,7 @@ public:
 	// following are public for OCC
 	int 			row_cnt;
 	int	 			wr_cnt;
+	int				rdwr_cnt;
 	Access **		accesses;
 	int 			num_accesses_alloc;
 
@@ -116,20 +121,35 @@ public:
 	RC				index_read_range(index_base* index, idx_key_t min_key, idx_key_t max_key, itemid_t** items, size_t& count, int part_id);
 	RC				index_read_range_rev(index_base* index, idx_key_t min_key, idx_key_t max_key, itemid_t** items, size_t& count, int part_id);
 
-	row_t * 		get_row(row_t * row, access_t type, coro_yield_t &yield, int coro_id);
 	row_t * 		get_row(row_t * row, access_t type);
 	void *			reserve();
 	RC apply_index_changes(RC rc);
 
 	bool insert_idx(index_base* index, uint64_t key, row_t* row, int part_id);
 	bool remove_idx(index_base* index, uint64_t key, row_t* row, int part_id);
+
+	row_t* search(index_base* index, size_t key, int part_id, access_t type);
+
+	// idx_key_t cur_key;
+	// bool 			do_print = false;
+	// bool			lock_print = false;
+	// int				owner_before;
+	// int				owner_cur;
+	// void 			*lock_addr;
+	// int 		locked;
+	// int 		locked_total;
+	// uint64_t 	insert_fail = 0;
+	// bool 		do_print = false;
+	// bool 		payment_print = false;
 	
 protected:	
-	void 			insert_row(row_t * row, table_t * table);
+	bool 			insert_row(row_t * &row, table_t * table, int part_id, uint64_t& out_row_id);
 	bool 			remove_row(row_t* row);
 private:
 	// insert rows
 	uint64_t 		insert_cnt;
+	// uint64_t		inserted;
+	// uint64_t        inserted_total;
 	row_t * 		insert_rows[MAX_ROW_PER_TXN];
 	uint64_t 		remove_cnt;
 	row_t * 		remove_rows[MAX_ROW_PER_TXN];
