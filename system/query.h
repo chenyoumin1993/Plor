@@ -21,6 +21,7 @@ public:
 	uint64_t backoff = BACKOFF_CYCLE;
 	bool readonly = false;
 	bool read_committed = false;
+	bool ro_print = false;
 	TPCCTxnType type;
 };
 

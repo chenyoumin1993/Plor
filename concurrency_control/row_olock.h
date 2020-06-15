@@ -419,6 +419,8 @@ private:
     uint8_t s_lock;
     uint64_t readers;
 
+    std::mutex mtx; // Used in legacy mode (w/o the lock-free optimizations)
+
     // Larger than 64 cores.
     DirectLockItem dirLock; // Including both read/write lock slots.
     LockItem readLock;  // 64-bit, managing a ringbuffer for readers.
@@ -430,6 +432,18 @@ private:
     RC lock_get_ex(lock_t type, txn_man *txn);
     RC lock_release_sh(lock_t type, txn_man *txn);
     RC lock_release_ex(lock_t type, txn_man *txn);
+
+    void mtx_get() {
+    #if DLOCK_LOCKFREE == 0
+        mtx.lock();
+    #endif
+    }
+    
+    void mtx_release() {
+    #if DLOCK_LOCKFREE == 0
+        mtx.unlock();
+    #endif
+    }
 };
 #endif
 

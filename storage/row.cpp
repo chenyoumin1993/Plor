@@ -239,6 +239,7 @@ void row_t::free_row() {
 
 RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	RC rc = RCOK;
+	txn->conflict_type = 0;
 	if (txn->wound)
 		return Abort;
 #if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
@@ -287,6 +288,11 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
 		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
+		// if (CC_ALG == WOUND_WAIT || CC_ALG == WAIT_DIE) {
+		// 	assert(txn->conflict_type != 0);
+		if (CC_ALG == DLOCK) {
+			assert(txn->conflict_type == 2);
+		}
 		uint64_t starttime = get_sys_clock();
 #if CC_ALG == DL_DETECT	
 		bool dep_added = false;
@@ -342,7 +348,11 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 
 		ts_t wait_end = get_sys_clock();
 		if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
-			last_waiting_time += wait_end - wait_start; // ns
+			if (txn->conflict_type == 1) {
+				last_waiting_time_1 += wait_end - wait_start; // ns
+			} else if (txn->conflict_type == 2) {
+				last_waiting_time_2 += wait_end - wait_start; // ns
+			}
 		}
 
 		if (txn->lock_ready) {
@@ -468,6 +478,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	assert (row == NULL || row == this || type == XP);
 #endif
 	if (ROLL_BACK && type == XP && INTERACTIVE_MODE == 0) {// recover from previous writes.
+		wait_cycles(WAIT_CYCLE);
 		this->copy(row);
 	}
 
@@ -488,6 +499,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	#if INTERACTIVE_MODE == 1
 		this->remote_write(row);
 	#else
+		wait_cycles(WAIT_CYCLE);
 		this->copy(row);
 	#endif
 		this->increase_version();

@@ -264,6 +264,8 @@ RC Row_dlock::lock_get_ex(lock_t type, txn_man *txn) {
     // 1. Check if owner is NULL, become the owner if true.
     Owner o, o_new;
 
+    mtx_get();
+
 _start:
     // Read a snapshot.
     o._owner = owner._owner;
@@ -287,6 +289,7 @@ _start:
             //     printf("lock_direct, txn=%d, row=%p\n", txn->get_thd_id(), _row);
             // }
             // mtx.unlock();
+            mtx_release();
             return RCOK;
         } else {
             // Can fail if others become the owner.
@@ -317,6 +320,7 @@ _start:
         if (!dirLock.lock((uint8_t)txn->get_thd_id(), type)) {
             // No available slots in dirLock.
             if (!writeLock.lock((uint8_t)txn->get_thd_id(), txn->get_ts(), (uint64_t)this)) {
+                mtx_release();
                 return Abort;
             }
         }
@@ -325,6 +329,8 @@ _start:
     //     printf("lock_wait, txn=%d, row=%p\n", txn->get_thd_id(), _row);
     // }
     // mtx.unlock();
+    mtx_release();
+    txn->conflict_type = 2;
     return WAIT;
 }
 
@@ -333,12 +339,15 @@ RC Row_dlock::lock_get_sh(lock_t type, txn_man *txn) {
     txn_man *cur_owner;
     uint64_t temp;
 _start:
+    // mtx_get();
     o._owner = owner._owner;
     temp = o.owner;
     cur_owner = (txn_man *)temp;
-    if (!txn->readonly)
+    if (!txn->readonly) {
         bmpRd->Set(txn->get_thd_id());
+    }
     if (bmpRd->isSet(63) && cur_owner != NULL) {
+        // mtx_release();
         if (cur_owner->get_ts() < txn->get_ts()) {
             if (!txn->readonly)
                 bmpRd->Unset(txn->get_thd_id());
@@ -352,6 +361,9 @@ _start:
                 goto _start;
             }
         }
+    } else {
+        // Successfully get the shared lock.
+        // mtx_release();
     }
     return RCOK;
 }
@@ -368,8 +380,9 @@ RC Row_dlock::validate(txn_man *txn) {
     if (txn->wound) {
         return Abort;
     }
-    
+    // mtx_get();
     bmpRd->Set(63);
+    // mtx_release();
     // Check the readers, wound all the young readers and wait for all the old readers.
     // Read a snapshot:
     // BitMap bmpRdSnapshot = *bmpRd;
@@ -492,6 +505,7 @@ RC Row_dlock::lock_release_ex(lock_t type, txn_man *txn) {
     //         printf("unlock, txn=%d, row=%p\n", txn->get_thd_id(), _row);
     //     }
     // }
+    mtx_get();
     if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
         if (bmpWr->isSet(txn->get_thd_id()))
             bmpWr->Unset(txn->get_thd_id());
@@ -508,6 +522,7 @@ _start:
     o_new._owner = o._owner;
     if ((uint8_t)txn->get_thd_id() != (o.tid - 1)) {
         // printf("txn = %d, cur_txn = %d, row = %p\n", txn->get_thd_id(), o.tid, _row);
+        mtx_release();
         return RCOK;
     }
 
@@ -559,6 +574,7 @@ _start:
         asm volatile ("sfence" ::: "memory");
         txn_old->lock_ready = true;
     }
+    mtx_release();
     return RCOK;
 }
 
@@ -566,7 +582,10 @@ RC Row_dlock::lock_release_sh(lock_t type, txn_man *txn) {
     // Unset myself is enough.
     if (txn->readonly)
         return RCOK;
-   if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
+    
+    // mtx_get();
+    
+    if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
         bmpRd->Unset(txn->get_thd_id());
     } else {
         if (!dirLock.unlock((uint8_t)txn->get_thd_id(), type)) {
@@ -575,6 +594,8 @@ RC Row_dlock::lock_release_sh(lock_t type, txn_man *txn) {
         }
     }
     // lock_cnt -= 1;
+
+    // mtx_release();
     return RCOK;
 }
 
@@ -597,6 +618,7 @@ void Row_dlock::poll_lock_state(txn_man *txn) {
             // not myself.
             return;
         }
+        // mtx_get();
         o_new.owner = (uint64_t)txn_old;
         if (txn_old != NULL) {
             o_new.tid = (uint8_t)txn_old->get_thd_id() + 1;
@@ -609,14 +631,17 @@ void Row_dlock::poll_lock_state(txn_man *txn) {
             if (txn_old != NULL)
                 txn_old->lock_ready = true;
         }
+        // mtx_release();
     } else if (!o.wound && cur_owner->get_ts() > txn->get_ts()) { // FIXME.
         // wound it.
+        // mtx_get();
         o_new.wound = 1;
         if (__sync_bool_compare_and_swap((uint64_t *)&owner._owner, (uint64_t)o._owner, (uint64_t)o_new._owner)) {
             // I can make sure it is still that owner.
             asm volatile ("sfence" ::: "memory");
             cur_owner->wound = true;
         }
+        // mtx_release();
     }
 }
 

@@ -89,6 +89,8 @@ public:
 	bool ex_mode = false;
 	bool readonly = false;
 	bool read_committed = false;
+
+	int conflict_type = 0; // rw:1; ww:2;
 #ifdef DEBUG_WOUND
 	int wound_cnt = 1;
 	int wound_cnt_discovered = 0;

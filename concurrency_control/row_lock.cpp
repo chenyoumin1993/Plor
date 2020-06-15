@@ -35,6 +35,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn) {
 RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt) {
 	assert (CC_ALG == DL_DETECT || CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT);
 	RC rc;
+	int conflict_type = 0;
 	int part_id =_row->get_part_id();
 	if (g_central_man)
 		glob_manager->lock_row(_row);
@@ -91,8 +92,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 	// Some txns coming earlier is waiting. Should also wait.
 	if (CC_ALG == DL_DETECT && waiters_head != NULL)
 		conflict = true;
-	
-	if (conflict) { 
+
+	if (conflict) {
 		// Cannot be added to the owner list.
 		if (CC_ALG == NO_WAIT) {
 			rc = Abort;
@@ -204,6 +205,7 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 				// Althrough we wound the owner, we cannot acquire the lock immediately.
 				rc = WAIT;
 				txn->lock_ready = false;
+				conflict_type = (woundees->type == type) ? 2 : 1;
 			} else { // wait
 				// insert txn to the right position 
 				// the waiter list is always in timestamp decreasing order, tail get the lock firstly.
@@ -225,6 +227,8 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
                 rc = WAIT;
 
 				en = owners;
+
+				conflict_type = (owners->type == type) ? 2 : 1;
             }
 		}
 	} else {
@@ -259,6 +263,21 @@ RC Row_lock::lock_get(lock_t type, txn_man * txn, uint64_t* &txnids, int &txncnt
 		}
 	}
 final:
+
+	if (rc == WAIT) {
+		if (CC_ALG != WOUND_WAIT) {
+			assert(owners != NULL);
+			if (type != owners->type) {
+				// R-W conflict
+				txn->conflict_type = 1;
+			} else {
+				// W-W conflict
+				txn->conflict_type = 2;
+			}
+		} else {
+			txn->conflict_type = conflict_type;
+		}
+	}
 	
 	if (rc == WAIT && CC_ALG == DL_DETECT) {
 		// Update the waits-for graph

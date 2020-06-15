@@ -82,6 +82,7 @@ Row_silo::write(row_t * data, uint64_t tid) {
 #if INTERACTIVE_MODE == 1
 	_row->remote_write(data);
 #else
+	wait_cycles(WAIT_CYCLE);
 	_row->copy(data);
 #endif
 #if ATOMIC_WORD

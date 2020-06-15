@@ -629,7 +629,7 @@ RC txn_man::finish(RC rc) {
 		}
 		ts_t wait_end = get_sys_clock();
 		if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
-			last_waiting_time += wait_end - wait_start; // ns
+			last_waiting_time_1 += wait_end - wait_start; // ns
 		}
 	} else if (rc == RCOK && readonly && !read_committed) {
 		for (int i = 0; i < row_cnt; i++) {

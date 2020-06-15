@@ -198,8 +198,8 @@ void tpcc_query::gen_order_status(uint64_t thd_id) {
 
 void tpcc_query::gen_stock_level(uint64_t thd_id) {
   type = TPCC_STOCK_LEVEL;
-  readonly = false;
-  read_committed = true;
+  readonly = true;
+  read_committed = false;
   tpcc_query_stock_level& arg = args.stock_level;
 
   if (FIRST_PART_LOCAL) {

@@ -269,6 +269,7 @@ void Stats::print() {
 	if (g_prt_lat_distr)
 		print_lat_distr(0);
 
+	// print_lat_distr(5);
 	// printf("\n");
 	// for (int i = 1; i <=5; ++i) {
 	// 	print_lat_distr(i);
@@ -310,6 +311,7 @@ void Stats::print_lat_distr(int off) {
 
 	for (uint i = 0; i < g_thread_cnt; ++i) {
 		if (_stats[i] == NULL) continue;
+		// if ((i % 2) != 0) continue;
 		for (int j = 0; j < MAX_LAT; ++j) {
 			total_lat_dis[j] += _stats[i]->lat_dis[off][j];
 			total_cnt += (double)_stats[i]->lat_dis[off][j];
@@ -321,6 +323,7 @@ void Stats::print_lat_distr(int off) {
 
 	double tmp_cnt = 0;
 	bool p_50 = false, /*p_90 = false, p_95 = false,*/ p_99 = false, p_999 = false, p_max = false;
+	int p_max_lat = 0;
 	for (int i = 0; i < MAX_LAT; ++i) {
 		tmp_cnt += (double)total_lat_dis[i];
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
@@ -346,8 +349,15 @@ void Stats::print_lat_distr(int off) {
 		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
 			printf ("%d\t", i);
 			p_max = true;
+			p_max_lat = i;
 		}
 	}
+
+	// printf("\n");
+	// for (int i = 0; i <= p_max_lat; ++i) {
+	// 	printf("%d\t", total_lat_dis[i]);
+	// }
+	// printf("\n");
 
 	double abt_cnt = 0;
 	p_50 = false;

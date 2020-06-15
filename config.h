@@ -1,13 +1,13 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 #define CORE_CNT 36
-#define CC_ALG WAIT_DIE
+#define CC_ALG DLOCK
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 
 #define CORO_CNT 1
 #define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
@@ -38,6 +38,9 @@
 #define PERSISTENT_LOG 0
 
 #define TS_OPT 0
+
+#define YCSB_RO_TEST 1
+#define YCSB_RO_RATIO 0.1
 
 // #define DEBUG_WOUND 1
 
@@ -159,7 +162,7 @@
 #define SCAN_LEN					20
 #define PART_PER_TXN 				1
 #define PERC_MULTI_PART				1
-#define REQ_PER_QUERY				16
+#define REQ_PER_QUERY				48
 #define FIELD_PER_TUPLE				10
 // ==== [TPCC] ====
 // For large warehouse count, the tables do not fit in memory
@@ -172,6 +175,9 @@
 #define WH_UPDATE					true
 #define NUM_WH 1
 #define TPCC_NP false
+
+#define SMALL_RATIO 0.9
+#define DLOCK_LOCKFREE 0
 //
 enum TPCCTxnType {TPCC_ALL, 
 				TPCC_PAYMENT, 

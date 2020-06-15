@@ -67,6 +67,7 @@ Row_hlock::write(row_t * data, uint64_t tid) {
 #if INTERACTIVE_MODE == 1
 	_row->remote_write(data);
 #else
+	wait_cycles(WAIT_CYCLE);
 	_row->copy(data);
 #endif
 	WrLockItem l_old, l_new;
@@ -105,7 +106,7 @@ Row_hlock::lock_wr(txn_man *txn) {
 	while (!txn->wound) {
 		// Read a snapshot.
 		if (_row->is_deleted)
-			return 2;
+			goto _success;
 		asm volatile ("lfence" ::: "memory");
 		l_old.l_wr = lockWr->l_wr;
 		l_new.l_wr = l_old.l_wr;
@@ -146,7 +147,7 @@ _success:
 
 	wait_end = get_sys_clock();
 	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
-		last_waiting_time += wait_end - wait_start; // ns
+		last_waiting_time_2 += wait_end - wait_start; // ns
 	}
 
 	if (_row->is_deleted)
@@ -167,6 +168,8 @@ _success:
 	bmpRd->Set(63);
 	if (bmpRd->isEmpty())
 		return 0;
+	
+	wait_start = get_sys_clock();
 	for (uint i = 0; i < THREAD_CNT; ++i) {
 		txn->waiting = false;
         if (i != txn->get_thd_id() && i != 63 && bmpRd->isSet(i)) {
@@ -189,13 +192,24 @@ _success:
                 if (txn->wound) {
 					// Lock is acquired.
 					// INC_STATS(txn->get_thd_id(), wound3, 1);
-                    return 1;
+                    goto _end;
                 }
             }
         }
 		asm volatile ("lfence" ::: "memory");
     }
-	return 0;
+
+_end:
+	wait_end = get_sys_clock();
+	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
+		last_waiting_time_1 += wait_end - wait_start; // ns
+	}
+
+	if (txn->wound) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 void

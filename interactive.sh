@@ -4,12 +4,12 @@ replace()
 	sed -i "$1s/.*/$2/" $3
 }
 
-CC_AGS=(WOUND_WAIT DLOCK HLOCK SILO)
+CC_AGS=(NO_WAIT WAIT_DIE WOUND_WAIT DLOCK HLOCK SILO)
 # CC_AGS=(DLOCK)
 MAX_THD=(1 4 8 12 16 20 24 28 32 36)
 # MAX_THD=(36)
-ZIPF=(0.99)
-READ=(0.5)
+ZIPF=(0.8)
+READ=(0.95)
 
 
 # echo "uniform, w/o log"

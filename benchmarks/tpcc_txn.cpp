@@ -891,16 +891,20 @@ bool tpcc_txn_man::stock_level_getStockCount(uint64_t ol_w_id, uint64_t ol_d_id,
   //   AND S_QUANTITY < ?
 
   // 20 orders * 15 items = 300; use 301 to check any errors.
-  uint64_t ol_i_id_list[301];
+
+  uint64_t n_orders = 2;
+  uint64_t count = n_orders * 15 + 1;
+
+  uint64_t ol_i_id_list[count];
   size_t list_size = 0;
 
   auto index = _wl->i_orderline;
   auto key = orderlineKey(1, ol_o_id - 1, ol_d_id, ol_w_id);
-  auto max_key = orderlineKey(15, ol_o_id - 20, ol_d_id, ol_w_id);
+  auto max_key = orderlineKey(15, ol_o_id - n_orders, ol_d_id, ol_w_id);
   auto part_id = wh_to_part(ol_w_id);
 
-  itemid_t* items[301];
-  uint64_t count = 301;
+  itemid_t* items[count];
+  // uint64_t count = 301;
 
   auto idx_rc = index_read_range(index, key, max_key, items, count, part_id);
   if (idx_rc == Abort) return false;
@@ -921,10 +925,10 @@ bool tpcc_txn_man::stock_level_getStockCount(uint64_t ol_w_id, uint64_t ol_d_id,
     ol_i_id_list[list_size] = ol_i_id;
     list_size++;
   }
-  assert(list_size <= 300);
+  assert(list_size <= count);
 
 // #ifndef TPCC_FOEDUS_DUPLICATE_ITEM
-  uint64_t distinct_ol_i_id_list[300];
+  uint64_t distinct_ol_i_id_list[count];
   uint64_t distinct_ol_i_id_count = 0;
 // #endif
   uint64_t result = 0;

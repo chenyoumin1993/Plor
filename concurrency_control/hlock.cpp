@@ -91,7 +91,7 @@ txn_man::validate_hlock()
 		_cur_tid ++;
 final:
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
-		last_waiting_time += wait_end - wait_start; // ns
+		// last_waiting_time += wait_end - wait_start; // ns
 	}
 	rc = apply_index_changes(rc);
 	if (rc == Abort) {

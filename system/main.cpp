@@ -228,6 +228,7 @@ void * f(void * id) {
 	}
 #endif
 
+	/*
 	for (int i = 0; i < CORO_CNT - 1; i++) {
 		next_coro[i] = i + 1;
 		// coro_arr[i] = coro_call_t(bind(exec, _1, i * CORE_CNT + tid), attributes(fpu_not_preserved));
@@ -238,6 +239,8 @@ void * f(void * id) {
 	// coro_arr[CORO_CNT - 1] = coro_call_t(bind(exec, _1, (CORO_CNT - 1) * CORE_CNT + tid), attributes(fpu_not_preserved));
 	coro_arr[CORO_CNT - 1] = coro_call_t(bind(exec, _1, (CORO_CNT - 1) * CORE_CNT + tid));
 	coro_arr[0]();
+	*/
+	m_thds[tid]->run();
 	return NULL;
 }
 

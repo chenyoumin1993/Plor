@@ -102,18 +102,50 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 #else
 	double rnd;
 	drand48_r(&_query_thd->buffer, &rnd);
+	double ro;
+	bool is_rotx = false;
+	drand48_r(&_query_thd->buffer, &ro);
+	if (ro < YCSB_RO_RATIO)
+		is_rotx = true;
 	UInt32 total_req_cnt;
-	if (rnd < 0.9) {
+#if YCSB_RO_TEST == 1
+	if (rnd < SMALL_RATIO) {
+		total_req_cnt = 4;
+	} else {
+		total_req_cnt = 16;
+	}
+	if (is_rotx)
+		total_req_cnt = g_req_per_query;
+#else
+	if (rnd < SMALL_RATIO) {
 		total_req_cnt = 4;
 	} else {
 		total_req_cnt = g_req_per_query;
 	}
+#endif
 	// total_req_cnt = (int)(rnd * g_req_per_query) + 1;
 #endif
+
 	for (UInt32 tmp = 0; tmp < total_req_cnt; tmp ++) {	
 		double r;
 		drand48_r(&_query_thd->buffer, &r);
 		ycsb_request * req = &requests[rid];
+	#if YCSB_RO_TEST == 1
+		if (is_rotx) {
+			req->rtype = RD;
+			readonly = 1;
+			ro_print = 1;
+		} else {
+			if (r < g_read_perc) {
+				req->rtype = RD;
+			} else if (r >= g_read_perc && r <= g_write_perc + g_read_perc) {
+				req->rtype = WR;
+			} else {
+				req->rtype = SCAN;
+				req->scan_len = SCAN_LEN;
+			}
+		}
+	#else
 		if (r < g_read_perc) {
 			req->rtype = RD;
 		} else if (r >= g_read_perc && r <= g_write_perc + g_read_perc) {
@@ -122,7 +154,7 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 			req->rtype = SCAN;
 			req->scan_len = SCAN_LEN;
 		}
-
+	#endif
 		// the request will access part_id.
 		uint64_t ith = tmp * part_num / total_req_cnt;
 		uint64_t part_id = 
@@ -130,7 +162,16 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 		uint64_t table_size = g_synth_table_size / g_virtual_part_cnt;
 		uint64_t row_id = zipf(table_size - 1, g_zipf_theta);
 		assert(row_id < table_size);
+#if YCSB_RO_TEST == 1
+		uint64_t primary_key;
+		if (thd_id == 0) {
+			primary_key = row_id * g_virtual_part_cnt + part_id;
+		} else {
+			primary_key = row_id * g_virtual_part_cnt + part_id;
+		}
+#else
 		uint64_t primary_key = row_id * g_virtual_part_cnt + part_id;
+#endif
 		req->key = primary_key;
 		int64_t rint64;
 		lrand48_r(&_query_thd->buffer, &rint64);

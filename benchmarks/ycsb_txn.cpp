@@ -76,16 +76,18 @@ RC ycsb_txn_man::run_txn(base_query * query) {
 						__attribute__((unused)) uint64_t fval = *(uint64_t *)(&data[fid * 10]);
 //                  }
                 } else {
+					// printf("---%d\n", req->rtype);
                     assert(req->rtype == WR);
+					// printf("+++%d\n", req->rtype);
 					// int size = _wl->the_table->schema->get_tuple_size();
 					// for (int off = 0; off < size; off += 64) {
 					// 	char * data = row->get_data();
 					// 	*(uint64_t *)(&data[off]) = get_thd_id();
 					// }
 					// for (int fid = 0; fid < schema->get_field_cnt(); fid++) {
-						int fid = 0;
-						char * data = row->get_data();
-						*(uint64_t *)(&data[fid * 100]) = 0;
+					int fid = 0;
+					char * data = row->get_data();
+					*(uint64_t *)(&data[fid * 100]) = 0;
 					// }
                 } 
             }

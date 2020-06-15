@@ -186,9 +186,10 @@ RC thread_t::run() {
 
 		m_txn->readonly = m_txn->read_committed = false;
 
-		if (m_query->readonly) {
+		if (m_query->readonly && m_query->abort_cnt <= 3) {
 			m_txn->readonly = true;
 		}
+		
 		if (m_query->read_committed) {
 			m_txn->read_committed = true;
 		}
@@ -315,7 +316,7 @@ RC thread_t::run() {
 				// wait cycles.
 				uint64_t cycles_to_wait = (m_query->backoff == 0) ? 0 : rand_r(&seed) % m_query->backoff;
 				if (CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == SILO)
-					cycles_to_wait = (m_query->readonly) ? 100 : cycles_to_wait;
+					cycles_to_wait = (m_query->readonly) ? cycles_to_wait : cycles_to_wait;
 				// double r;
 				// drand48_r(&buffer, &r);
 				// uint64_t cycles_to_wait = r * m_query->backoff;
@@ -336,8 +337,10 @@ RC thread_t::run() {
 		}
 		if (rc == RCOK){
 			m_query->stop_time = get_sys_clock();
-			DIS_STATS(get_thd_id(), lat_dis[0], ((m_query->stop_time - m_query->start_time) / 1000));
-			DIS_STATS(get_thd_id(), abort_dis[0], m_query->abort_cnt);
+			if (m_query->ro_print) {
+				DIS_STATS(get_thd_id(), lat_dis[0], ((m_query->stop_time - m_query->start_time) / 1000));
+				DIS_STATS(get_thd_id(), abort_dis[0], m_query->abort_cnt);
+			}
 #if WORKLOAD == TPCC
 			switch (((tpcc_query *)m_query)->type) {
 				case TPCC_NEW_ORDER :
@@ -374,21 +377,24 @@ RC thread_t::run() {
 			if (rc == RCOK) {
 				total_commit_cnt += 1;
 				total_commit_time += timespan;
-				total_waiting_2_commit_time += last_waiting_time; // ns
+				total_waiting_2_commit_time_1 += last_waiting_time_1; // ns
+				total_waiting_2_commit_time_2 += last_waiting_time_2; // ns
 				total_try_exec_2_commit_time += last_try_exec_time;
 				total_try_commit_2_commit_time += last_try_commit_time;
-				commit_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
-				waiting_2_commit_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
+				// commit_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
+				// waiting_2_commit_time_dis[(last_waiting_time_1 / 1000) >= 1000 ? 999 : (last_waiting_time_1 / 1000)] += 1;
 			} else {
 				total_abort_cnt += 1;
 				total_abort_time += timespan;
-				total_waiting_2_abort_time += last_waiting_time; // ns
+				total_waiting_2_abort_time_1 += last_waiting_time_1; // ns
+				total_waiting_2_abort_time_2 += last_waiting_time_2; // ns
 				total_try_exec_2_abort_time += last_try_exec_time;
 				total_try_commit_2_abort_time += last_try_commit_time;
-				abort_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
-				waiting_2_abort_time_dis[(last_waiting_time / 1000) >= 1000 ? 999 : (last_waiting_time / 1000)] += 1;
+				// abort_time_dis[(timespan / 1000) >= 1000 ? 999 : (timespan / 1000)] += 1;
+				// waiting_2_abort_time_dis[(last_waiting_time_1 / 1000) >= 1000 ? 999 : (last_waiting_time_1 / 1000)] += 1;
 			}
-			last_waiting_time = 0;
+			last_waiting_time_1 = 0;
+			last_waiting_time_2 = 0;
 			last_try_exec_time = 0;
 			last_try_commit_time = 0;
 		}
@@ -430,14 +436,16 @@ _end:
 	// printf("lock_cnt = %d\n", lock_cnt);
 	// assert(false);
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
-		printf("COMMIT\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		printf("COMMIT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
 		(long long)total_commit_cnt, (long long)total_commit_time / 1000, 
-		(long long)total_waiting_2_commit_time / 1000, 
+		(long long)total_waiting_2_commit_time_1 / 1000, 
+		(long long)total_waiting_2_commit_time_2 / 1000, 
 		(long long)total_try_exec_2_commit_time / 1000, 
 		(long long)total_try_commit_2_commit_time / 1000);
-		printf("ABORT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		printf("ABORT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
 		(long long)total_abort_cnt, (long long)total_abort_time / 1000, 
-		(long long)total_waiting_2_abort_time / 1000, 
+		(long long)total_waiting_2_abort_time_1 / 1000, 
+		(long long)total_waiting_2_abort_time_2 / 1000, 
 		(long long)total_backoff_time / 1000, 
 		(long long)total_try_exec_2_abort_time / 1000, 
 		(long long)total_try_commit_2_abort_time / 1000);
