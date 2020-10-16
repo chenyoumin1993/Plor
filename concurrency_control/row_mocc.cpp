@@ -37,7 +37,14 @@ RC
 Row_mocc::access(txn_man * txn, TsType type, row_t * local_row) {
 #if ATOMIC_WORD
     int lt = (type == R_REQ) ? LOCK_SH : LOCK_EX;
+
+    ts_t wait_start = get_sys_clock();
+	ts_t wait_end;
     lock(txn, lt, true);
+    wait_end = get_sys_clock();
+	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
+		last_waiting_time_1 += (wait_end - wait_start); // ns
+	}
 
 	uint64_t v = 0;
 	uint64_t v2 = 1;

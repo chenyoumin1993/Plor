@@ -1,13 +1,13 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 36
-#define CC_ALG MOCC
+#define CORE_CNT 20
+#define CC_ALG SILO
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
 #define WRITE_PERC .5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
-#define WORKLOAD TPCC
+#define WORKLOAD YCSB
 
 #define CORO_CNT 1
 #define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
@@ -21,7 +21,7 @@
 
 #define THREAD_CNT (CORO_CNT * CORE_CNT)
 
-#define WAIT_CYCLE 1
+#define WAIT_CYCLE 0
 
 #define BACKOFF_CYCLE 3750
 

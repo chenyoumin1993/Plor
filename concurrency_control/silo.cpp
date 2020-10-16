@@ -37,6 +37,8 @@ txn_man::validate_silo()
 	int num_locks = 0;
 	ts_t max_tid = 0;
 	bool done = false;
+	ts_t wait_start__ = 0, wait_end__ = 0;
+
 	if (_pre_abort && !read_committed) { // Here, read_committed TXs are read-only TXs.
 		for (int i = 0; i < wr_cnt; i++) {
 			row_t * row = accesses[ write_set[i] ]->orig_row;
@@ -54,6 +56,7 @@ txn_man::validate_silo()
 		}
 	}
 
+	wait_start__ = get_sys_clock();
 	// lock all rows in the write set.
 	if (_validation_no_wait) {
 		while (!done) {
@@ -138,6 +141,14 @@ txn_man::validate_silo()
 	else 
 		_cur_tid ++;
 final:
+
+	wait_end__ = get_sys_clock();
+
+	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
+        if (wait_start__ != 0 && wait_end__ != 0)
+    		last_waiting_time_1 += (wait_end__ - wait_start__); // ns
+	}
+	
 	rc = apply_index_changes(rc);
 	if (rc == Abort) {
 		for (int i = 0; i < num_locks; i++) 

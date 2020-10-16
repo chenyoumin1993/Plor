@@ -30,20 +30,29 @@ Row_silo::set_tid(uint64_t tid) {
 
 RC
 Row_silo::access(txn_man * txn, TsType type, row_t * local_row) {
+	ts_t wait_start_1, wait_start_2, wait_end_1;
+
 #if ATOMIC_WORD
 	uint64_t v = 0;
 	uint64_t v2 = 1;
+	wait_start_1 = get_sys_clock();
 	while (v2 != v) {
 		v = _tid_word;
 		while (v & LOCK_BIT) {
 			PAUSE
 			v = _tid_word;
 		}
+		wait_start_2 = get_sys_clock();
 		local_row->copy(_row);
 		COMPILER_BARRIER
 		v2 = _tid_word;
-	} 
+	}
 	txn->last_tid = v & (~LOCK_BIT);
+	wait_end_1 = get_sys_clock();
+
+	if (PRINT_LAT_DEBUG && txn->get_thd_id() == 0) {
+		last_waiting_time_1 += ((wait_end_1 - wait_start_1) - (wait_end_1 - wait_start_2)); // ns
+	}
 #else 
 	lock();
 	local_row->copy(_row);
