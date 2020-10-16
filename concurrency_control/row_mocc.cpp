@@ -200,7 +200,7 @@ Row_mocc::lock(txn_man *txn, int lt, bool enable_hotness) {
 }
 
 bool
-Row_mocc::lock_insert(txn_man *txn, int lt, bool enable_hotness) {
+Row_mocc::lock_insert(txn_man *txn, int lt) {
     if (lt == LOCK_EX) {
         lock_wr(txn);
     } else {

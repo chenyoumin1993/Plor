@@ -17,6 +17,8 @@
 #include "wl.h"
 #include "row_olock.h"
 #include "row_hlock.h"
+#include "row_mocc.h"
+#include <math.h>
 
 #if INTERACTIVE_MODE == 1
 #include "rpc.h"
@@ -43,6 +45,9 @@ row_t::init(table_t * host_table, uint64_t part_id, uint64_t row_id) {
 	this->version = 0;
 	this->table = host_table;
 	this->is_deleted = false;
+#if CC_ALG == MOCC
+	this->temperature = 0;
+#endif
 	Catalog * schema = host_table->get_schema();
 	int tuple_size = schema->get_tuple_size();
 	data = (char *) _mm_malloc(sizeof(char) * tuple_size, 64);
@@ -82,6 +87,8 @@ void row_t::init_manager(row_t * row) {
 	manager = (Row_tictoc *) _mm_malloc(sizeof(Row_tictoc), 64);
 #elif CC_ALG == SILO
 	manager = (Row_silo *) _mm_malloc(sizeof(Row_silo), 64);
+#elif CC_ALG == MOCC
+	manager = (Row_mocc *)  _mm_malloc(sizeof(Row_mocc), 64);
 #elif CC_ALG == HLOCK
 	manager = (Row_hlock *) _mm_malloc(sizeof(Row_hlock), 64);
 #elif CC_ALG == VLL
@@ -447,7 +454,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	// This is a new copy just made.
 	row = txn->cur_row;
 	return rc;
-#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
+#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
 	// like OCC, tictoc also makes a local copy for each read/write
 	row->table = get_table();
 	row->set_primary_key(get_primary_key());
@@ -531,7 +538,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	row->free_row();
 	mem_allocator.free(row, sizeof(row_t));
 	return;
-#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
+#elif CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
 	assert (row != NULL);
 	return;
 #elif CC_ALG == HSTORE || CC_ALG == VLL
@@ -540,3 +547,20 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 	assert(false);
 #endif
 }
+
+#if CC_ALG == MOCC
+void row_t::increase_temperature() {
+	while (true) {
+		double temp_old = temperature;
+		double temp_new = temp_old + pow(2, -temp_old);
+		if (temperature.compare_exchange_strong(temp_old, temp_new))
+			break;
+		asm volatile ("lfence" ::: "memory");
+	};
+}
+
+double row_t::get_temperature() {
+	return temperature;
+}
+
+#endif 

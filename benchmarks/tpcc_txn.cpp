@@ -892,7 +892,7 @@ bool tpcc_txn_man::stock_level_getStockCount(uint64_t ol_w_id, uint64_t ol_d_id,
 
   // 20 orders * 15 items = 300; use 301 to check any errors.
 
-  uint64_t n_orders = 2;
+  uint64_t n_orders = 20;
   uint64_t count = n_orders * 15 + 1;
 
   uint64_t ol_i_id_list[count];

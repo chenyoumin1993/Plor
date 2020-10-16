@@ -186,7 +186,7 @@ RC thread_t::run() {
 
 		m_txn->readonly = m_txn->read_committed = false;
 
-		if (m_query->readonly && m_query->abort_cnt <= 3) {
+		if (m_query->readonly && m_query->abort_cnt <= 100) {
 			m_txn->readonly = true;
 		}
 		
@@ -315,8 +315,8 @@ RC thread_t::run() {
 					m_query->backoff <<= 1;
 				// wait cycles.
 				uint64_t cycles_to_wait = (m_query->backoff == 0) ? 0 : rand_r(&seed) % m_query->backoff;
-				if (CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == SILO)
-					cycles_to_wait = (m_query->readonly) ? cycles_to_wait : cycles_to_wait;
+				if (CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == SILO || CC_ALG == MOCC)
+					cycles_to_wait = (m_query->readonly) ? 100 : cycles_to_wait;
 				// double r;
 				// drand48_r(&buffer, &r);
 				// uint64_t cycles_to_wait = r * m_query->backoff;
@@ -337,10 +337,10 @@ RC thread_t::run() {
 		}
 		if (rc == RCOK){
 			m_query->stop_time = get_sys_clock();
-			if (m_query->ro_print) {
+			// if (m_query->ro_print) {
 				DIS_STATS(get_thd_id(), lat_dis[0], ((m_query->stop_time - m_query->start_time) / 1000));
 				DIS_STATS(get_thd_id(), abort_dis[0], m_query->abort_cnt);
-			}
+			// }
 #if WORKLOAD == TPCC
 			switch (((tpcc_query *)m_query)->type) {
 				case TPCC_NEW_ORDER :

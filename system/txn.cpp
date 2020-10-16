@@ -15,6 +15,7 @@
 #include "row_lock.h"
 #include "row_olock.h"
 #include "row_hlock.h"
+#include "row_mocc.h"
 
 #define CONFIG_H "silo/config/config-perf.h"
 
@@ -54,6 +55,11 @@ void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	remove_cnt = 0;
 	insert_idx_cnt = 0;
 	remove_idx_cnt = 0;
+#if CC_ALG == MOCC
+	cur_lock_list_head = 0;
+	track_perf_sig = false;
+	lock_rd_cnt = 0;
+#endif
 	// inserted = 0;
 	// inserted_total = 0;
 	// locked = 0;
@@ -62,7 +68,7 @@ void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	for (int i = 0; i < MAX_ROW_PER_TXN; i++)
 		accesses[i] = NULL;
 	num_accesses_alloc = 0;
-#if CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK
+#if CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
 	_pre_abort = (g_params["pre_abort"] == "true");
 	if (g_params["validation_lock"] == "no-wait")
 		_validation_no_wait = true;
@@ -75,7 +81,7 @@ void txn_man::init(thread_t * h_thd, workload * h_wl, uint64_t thd_id) {
 	_max_wts = 0;
 	_write_copy_ptr = (g_params["write_copy_form"] == "ptr");
 	_atomic_timestamp = (g_params["atomic_timestamp"] == "true");
-#elif CC_ALG == SILO || CC_ALG == HLOCK
+#elif CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
 	_cur_tid = 0;
 #endif
 #if CC_ALG == OLOCK
@@ -285,7 +291,7 @@ void txn_man::cleanup(RC rc) {
 			orig_r->return_row(type, this, accesses[rid]->data);
 		}
 
-#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && CC_ALG != DLOCK && INTERACTIVE_MODE == 0
+#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && CC_ALG != DLOCK && CC_ALG != MOCC && INTERACTIVE_MODE == 0
 		accesses[rid]->data = NULL;
 #endif
 	}
@@ -302,6 +308,8 @@ void txn_man::cleanup(RC rc) {
 			assert(rc == RCOK);
 		#elif CC_ALG == SILO
 			row->manager->release();
+		#elif CC_ALG == MOCC
+			row->manager->unlock(this, LOCK_EX); // no need to unlock it, deleted.
 		#elif CC_ALG == HLOCK
 			row->manager->unlock_wr(this);
 		#else
@@ -319,7 +327,7 @@ void txn_man::cleanup(RC rc) {
 		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK
       		auto rc = row->manager->lock_release((lock_t)LOCK_EX, this);
       		assert(rc == RCOK);
-		#elif CC_ALG == SILO || CC_ALG == HLOCK
+		#elif CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
       		// Unlocking new rows is done in validate_*() to initialize row TID.
       		(void)row;
 		#else
@@ -339,6 +347,10 @@ void txn_man::cleanup(RC rc) {
 	rdwr_cnt = 0;
 	insert_cnt = 0;
 	remove_cnt = 0;
+
+#if CC_ALG == MOCC
+	lock_rd_cnt = 0;
+#endif
 	
 	insert_idx_cnt = 0;
 	remove_idx_cnt = 0;
@@ -375,7 +387,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	if (accesses[row_cnt] == NULL) {
 		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
 		accesses[row_cnt] = access;
-#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == DLOCK || CC_ALG == HLOCK)
+#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == MOCC)
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
@@ -454,7 +466,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 #if CC_ALG == TICTOC
 	accesses[row_cnt]->wts = last_wts;
 	accesses[row_cnt]->rts = last_rts;
-#elif CC_ALG == SILO
+#elif CC_ALG == SILO || CC_ALG == MOCC
 	accesses[row_cnt]->tid = last_tid;
 #elif CC_ALG == HEKATON
 	accesses[row_cnt]->history_entry = history_entry;
@@ -506,6 +518,8 @@ bool txn_man::insert_row(row_t * &row, table_t * table, int part_id, uint64_t& o
   	assert(rc == RCOK);
 #elif CC_ALG == SILO
 	row->manager->lock();
+#elif CC_ALG == MOCC
+	row->manager->lock_insert(this, LOCK_EX);
 #elif CC_ALG == HLOCK
 	row->manager->lock_wr(this);
 #else
@@ -616,6 +630,13 @@ RC txn_man::finish(RC rc) {
 		rc = apply_index_changes(rc);
 		cleanup(rc);
 	}
+#elif (CC_ALG == MOCC)
+	if (rc == RCOK) {
+		rc = validate_mocc();
+	} else { 
+		rc = apply_index_changes(rc);
+		cleanup(rc);
+	} 
 #elif CC_ALG == DLOCK
 	if (rc == RCOK && !readonly && !read_committed) {
 		ts_t wait_start = get_sys_clock();
@@ -680,3 +701,69 @@ txn_man::validate() {
   }
   return RCOK;
 }
+
+
+#if CC_ALG == MOCC
+bool 
+txn_man::is_locked(uint64_t key) {
+	for (int i = 0; i < cur_lock_list_head; ++i) {
+		if (cur_lock_list[i].row->get_primary_key() == key && cur_lock_list[i].state)
+			return true;
+	}
+	return false;
+}
+
+void 
+txn_man::remove_non_cononical_lock(uint64_t key) {
+	for (int i = (cur_lock_list_head - 1); i >= 0; --i) {
+		if (!cur_lock_list[i].state)
+			continue;
+
+		if (cur_lock_list[i].row->get_primary_key() < key) {
+			cur_lock_list[i].row->manager->unlock(this, cur_lock_list[i].lt);
+		} else {
+			cur_lock_list_head = i + 1;
+			return;
+		}
+	}
+
+	cur_lock_list_head = 0;
+}
+
+void 
+txn_man::insert_cononical_lock(int lt, row_t *row) {
+	cur_lock_list[cur_lock_list_head].row = row;
+	cur_lock_list[cur_lock_list_head].lt = lt;
+	cur_lock_list[cur_lock_list_head].state = true;
+	cur_lock_list_head += 1;
+}
+
+void 
+txn_man::remove_cononical_lock(uint64_t key) {
+	for (int i = 0; i < cur_lock_list_head; ++i) {
+		if (cur_lock_list[i].row->get_primary_key() == key)
+			cur_lock_list[i].state = false;
+	}
+}
+
+void 
+txn_man::unlock_read_locks_all() {
+	for (int i = 0; i < cur_lock_list_head; ++i) {
+		if (cur_lock_list[i].lt == LOCK_SH && cur_lock_list[i].state)
+			cur_lock_list[i].row->manager->unlock(this, LOCK_SH);
+	}
+}
+
+void 
+txn_man::clear_lock_state(RC rc) {
+	for (int i = 0; i < cur_lock_list_head; ++i) {
+		if (cur_lock_list[i].lt == LOCK_SH && cur_lock_list[i].state)
+			cur_lock_list[i].row->manager->unlock(this, LOCK_SH);
+		if (cur_lock_list[i].lt == LOCK_EX && cur_lock_list[i].state) {
+			cur_lock_list[i].row->manager->unlock(this, LOCK_EX);
+		}
+	}
+	cur_lock_list_head = 0;
+}
+
+#endif

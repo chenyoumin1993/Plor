@@ -29,7 +29,7 @@ public:
 #if CC_ALG == TICTOC
 	ts_t 		wts;
 	ts_t 		rts;
-#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == DLOCK)
+#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == DLOCK || CC_ALG == MOCC)
 	ts_t 		tid;
 	ts_t 		epoch;
 #elif CC_ALG == HEKATON
@@ -37,6 +37,14 @@ public:
 #endif
 
 };
+
+#if CC_ALG == MOCC
+struct RLL {
+	int lt;
+	row_t *row;
+	bool state;
+};
+#endif
 
 class txn_man
 {
@@ -77,7 +85,7 @@ public:
 	void 			update_max_wts(ts_t max_wts);
 	ts_t 			last_wts;
 	ts_t 			last_rts;
-#elif (CC_ALG == SILO || CC_ALG == HLOCK)
+#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC)
 	ts_t 			last_tid;
 	// uint64_t lock_holding;
 	// uint64_t lock_releasing;
@@ -143,6 +151,16 @@ public:
 	// uint64_t 	insert_fail = 0;
 	// bool 		do_print = false;
 	// bool 		payment_print = false;
+#if CC_ALG == MOCC
+	bool is_locked(uint64_t key);
+	void remove_non_cononical_lock(uint64_t key);
+	void insert_cononical_lock(int lt, row_t *row);
+	void remove_cononical_lock(uint64_t key);
+	void unlock_read_locks_all();
+	void clear_lock_state(RC rc);
+	bool track_perf_sig = false;
+	int	lock_rd_cnt = 0;
+#endif
 	
 protected:	
 	bool 			insert_row(row_t * &row, table_t * table, int part_id, uint64_t& out_row_id);
@@ -168,12 +186,17 @@ private:
 	idx_key_t	     remove_idx_key[MAX_ROW_PER_TXN];
 	int	      	   remove_idx_part_id[MAX_ROW_PER_TXN];
 
+#if CC_ALG == MOCC
+	RLL cur_lock_list[MAX_ROW_PER_TXN];
+	int cur_lock_list_head = 0;
+#endif
+
 
 	txnid_t 		txn_id;
 	ts_t 			timestamp;
 
 	bool _write_copy_ptr;
-#if (CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK)
+#if (CC_ALG == TICTOC || CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC)
 	bool 			_pre_abort;
 	bool 			_validation_no_wait;
 #endif
@@ -185,6 +208,10 @@ private:
 #elif (CC_ALG == SILO)
 	ts_t 			_cur_tid;
 	RC				validate_silo();
+#elif (CC_ALG == MOCC)
+	ts_t			_cur_tid;
+	int 			step = 0;
+	RC 				validate_mocc();
 #elif CC_ALG == HLOCK
 	ts_t 			_cur_tid;
 	RC				validate_hlock();

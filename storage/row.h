@@ -3,6 +3,7 @@
 #include <cassert>
 #include "global.h"
 #include "coro.h"
+#include <atomic>
 
 #define DECL_SET_VALUE(type) \
 	void set_value(int col_id, type value);
@@ -35,6 +36,7 @@ class Row_vll;
 class Row_olock;
 class Row_dlock;
 class Row_hlock;
+class Row_mocc;
 
 class row_t
 {
@@ -116,6 +118,10 @@ public:
   	Row_tictoc * manager;
   #elif CC_ALG == SILO
   	Row_silo * manager;
+  #elif CC_ALG == MOCC
+	Row_mocc * manager;
+	void increase_temperature();
+	double get_temperature();
   #elif CC_ALG == VLL
   	Row_vll * manager;
   #endif
@@ -130,4 +136,7 @@ private:
 	uint64_t		_part_id;
 	uint64_t 		_row_id;
 	uint64_t 		version = 0;
+#if CC_ALG == MOCC
+	std::atomic<double> temperature;
+#endif
 };

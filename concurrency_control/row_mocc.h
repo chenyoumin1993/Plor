@@ -8,7 +8,7 @@ struct TsReqEntry;
 #if CC_ALG==MOCC
 #define LOCK_BIT (1UL << 63)
 
-#define TEMP_THRESHOLD 100
+#define TEMP_THRESHOLD 18
 
 class Row_mocc {
 public:
@@ -21,7 +21,7 @@ public:
 	void				set_tid(uint64_t tid);
 
     bool lock(txn_man *txn, int lt, bool enable_hotness);
-    bool lock_insert(txn_man *txn, int lt, bool enable_hotness);
+    bool lock_insert(txn_man *txn, int lt);
     bool try_lock(txn_man *txn, int lt, bool enable_hotness);
     void unlock(txn_man *txn, int lt);
 
