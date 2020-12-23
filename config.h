@@ -1,10 +1,10 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 20
-#define CC_ALG SILO
-#define ZIPF_THETA 0.99
-#define READ_PERC 0.5
-#define WRITE_PERC .5
+#define CORE_CNT 36
+#define CC_ALG MOCC
+#define ZIPF_THETA 0.5
+#define READ_PERC 0.95
+#define WRITE_PERC .05
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
 #define WORKLOAD YCSB
