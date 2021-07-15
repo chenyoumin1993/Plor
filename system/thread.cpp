@@ -436,13 +436,13 @@ _end:
 	// printf("lock_cnt = %d\n", lock_cnt);
 	// assert(false);
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
-		printf("COMMIT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		printf("COMMIT@PERF\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
 		(long long)total_commit_cnt, (long long)total_commit_time / 1000, 
 		(long long)total_waiting_2_commit_time_1 / 1000, 
 		(long long)total_waiting_2_commit_time_2 / 1000, 
 		(long long)total_try_exec_2_commit_time / 1000, 
 		(long long)total_try_commit_2_commit_time / 1000);
-		printf("ABORT\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
+		printf("ABORT@PERF\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t", 
 		(long long)total_abort_cnt, (long long)total_abort_time / 1000, 
 		(long long)total_waiting_2_abort_time_1 / 1000, 
 		(long long)total_waiting_2_abort_time_2 / 1000, 

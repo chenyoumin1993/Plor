@@ -4,10 +4,10 @@ CFLAGS=-Wall -g -std=c++14
 .SUFFIXES: .o .cpp .h
 
 SRC_DIRS = ./ ./benchmarks/ ./concurrency_control/ ./storage/ ./system/
-INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system -I../eRPC/src -I../silo
+INCLUDE = -I. -I./benchmarks -I./concurrency_control -I./storage -I./system -I./eRPC/src -I./silo
 
-CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3 -DERPC_INFINIBAND=true
-LDFLAGS = -Wall -L. -L./libs -L../eRPC/build -pthread -g -lerpc -lrt -lnuma -ljemalloc -lprofiler -lboost_system -lboost_coroutine -lcityhash -ldl  -libverbs -lm
+CFLAGS += $(INCLUDE) -D NOGRAPHITE=1 -O3 -DERPC_INFINIBAND=true -DCONFIG_H=\"silo/config/config-perf.h\"
+LDFLAGS = -Wall -L. -L./libs -L./eRPC/build -pthread -g -lrt -lnuma -ljemalloc -lboost_system -lboost_coroutine -lcityhash -ldl  -libverbs -lm
 LDFLAGS += $(CFLAGS)
 
 CPPS = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.cpp))
@@ -16,15 +16,15 @@ DEPS = $(CPPS:.cpp=.d)
 
 all:rundb
 
-rundb : $(OBJS) ../silo/allocator.o \
-	../silo/masstree/compiler.o \
-	../silo/core.o \
-	../silo/counter.o \
-	../silo/masstree/json.o \
-	../silo/masstree/straccum.o \
-	../silo/masstree/string.o \
-	../silo/ticker.o \
-	../silo/rcu.o
+rundb : $(OBJS) ./silo/allocator.o \
+	./silo/masstree/compiler.o \
+	./silo/core.o \
+	./silo/counter.o \
+	./silo/masstree/json.o \
+	./silo/masstree/straccum.o \
+	./silo/masstree/string.o \
+	./silo/ticker.o \
+	./silo/rcu.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 -include $(OBJS:%.o=%.d)

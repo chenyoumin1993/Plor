@@ -1,7 +1,7 @@
 #define CONFIG_H "config/config-perf.h"
 
 #define NDB_MASSTREE 1
-#include "masstree/config.h"
+// #include "masstree/config.h"
 #include "masstree_btree.h"
 
 #ifdef NDEBUG

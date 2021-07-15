@@ -287,7 +287,7 @@ void Stats::print() {
 	}
 
 	// printf("%.2f\t%.2f\t", (double)abort_cnt1 / try_cnt, (double)abort_cnt2 / total_txn_cnt);
-	printf("%.2f\t", (double)abort_cnt1 / try_cnt);
+	printf("%.2f(ABT@RATE)\t", (double)abort_cnt1 / try_cnt);
 
 	// printf("total_tpcc_payment_commit= %lld\n", total_tpcc_payment_commit);
 	// printf("total_tpcc_new_order_commit= %lld\n", total_tpcc_new_order_commit);
@@ -327,7 +327,7 @@ void Stats::print_lat_distr(int off) {
 	for (int i = 0; i < MAX_LAT; ++i) {
 		tmp_cnt += (double)total_lat_dis[i];
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
-			printf ("%d\t", i);
+			printf ("%d(LAT@P50)\t", i);
 			p_50 = true;
 		}
 		// if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
@@ -339,15 +339,15 @@ void Stats::print_lat_distr(int off) {
 		// 	p_95 = true;
 		// }
 		if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
-			printf ("%d\t", i);
+			printf ("%d(LAT@P99)\t", i);
 			p_99 = true;
 		}
 		if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
-			printf ("%d\t", i);
+			printf ("%d(LAT@P999)\t", i);
 			p_999 = true;
 		} 
 		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
-			printf ("%d\t", i);
+			printf ("%d(LAT@P9999)\t", i);
 			p_max = true;
 			p_max_lat = i;
 		}
@@ -369,7 +369,7 @@ void Stats::print_lat_distr(int off) {
 	for (int i = 0; i < MAX_LAT; ++i) {
 		abt_cnt += (double)total_abt_dis[i];
 		if (abt_cnt / total_abt > 0.5 && p_50 == false) {
-			printf ("%d\t", i);
+			printf ("%d(ABT@P50)\t", i);
 			p_50 = true;
 		}
 		// if (abt_cnt / total_abt > 0.9 && p_90 == false) {
@@ -381,15 +381,15 @@ void Stats::print_lat_distr(int off) {
 		// 	p_95 = true;
 		// }
 		if (abt_cnt / total_abt > 0.99 && p_99 == false) {
-			printf ("%d\t", i);
+			printf ("%d(ABT@P99)\t", i);
 			p_99 = true;
 		}
 		if (abt_cnt / total_abt > 0.999 && p_999 == false) {
-			printf ("%d\t", i);
+			printf ("%d(ABT@P999)\t", i);
 			p_999 = true;
 		} 
 		if (abt_cnt / total_abt >= 0.9999 && p_max == false) {
-			printf ("%d\t", i);
+			printf ("%d(ABT@P9999)\t", i);
 			p_max = true;
 		} 
 	}
@@ -425,7 +425,7 @@ void Stats::performance(){
 	end_time = get_sys_clock();
 	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 
-	printf("%.2f\t", rate);
+	printf("%.2f(TP)\t", rate);
 	old_total_cnt = new_total_cnt;
 	// ProfilerStop();
 	// goto _start;
