@@ -1,4 +1,4 @@
-DBx1000
+Plor (general transactions with predictable, low tail latency)
 =======
 
 Plor is based on DBx1000, which is a single node OLTP database management system (DBMS).
@@ -45,7 +45,7 @@ The DBMS can be run with
 
 
 Output
----
-N(TP): throughput
-N(LAT@P99): 99th percentile latency
-N(ABT@P99): 99th percentile abort count
+-------------
+	N(TP): throughput
+	N(LAT@P99): 99th percentile latency
+	N(ABT@P99): 99th percentile abort count
