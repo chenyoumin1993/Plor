@@ -5,19 +5,19 @@ Plor is based on DBx1000, which is a single node OLTP database management system
 
 Dependencies
 ------------
-# for jemalloc 
-apt-get install libjemalloc-dev
+	# for jemalloc 
+	apt-get install libjemalloc-dev
 
-# for cityhash
-cd cityhash
-./configure
-make -j
-make install
+	# for cityhash
+	cd cityhash
+	./configure
+	make -j
+	make install
 
-# for masstree
-cd silo/masstree
-./configure
-make -j
+	# for masstree
+	cd silo/masstree
+	./configure
+	make -j
 
 Build & Test
 ------------
