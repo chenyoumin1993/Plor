@@ -39,7 +39,8 @@ Row_tictoc::access(txn_man * txn, TsType type, row_t * local_row)
 			PAUSE
 			v = _ts_word;
 		}
-		local_row->copy(_row);
+		// local_row->copy(_row);
+		memcpy(local_row->data, _row->data, _row->get_tuple_size());
 		COMPILER_BARRIER
 		v2 = _ts_word;
   #if WRITE_PERMISSION_LOCK

@@ -16,6 +16,7 @@
 #include "row_olock.h"
 #include "row_hlock.h"
 #include "row_mocc.h"
+#include "row_tictoc.h"
 
 #define CONFIG_H "silo/config/config-perf.h"
 
@@ -308,6 +309,8 @@ void txn_man::cleanup(RC rc) {
 			assert(rc == RCOK);
 		#elif CC_ALG == SILO
 			row->manager->release();
+		#elif CC_ALG == TICTOC
+			row->manager->release();
 		#elif CC_ALG == MOCC
 			row->manager->unlock(this, LOCK_EX); // no need to unlock it, deleted.
 		#elif CC_ALG == HLOCK
@@ -327,11 +330,12 @@ void txn_man::cleanup(RC rc) {
 		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK
       		auto rc = row->manager->lock_release((lock_t)LOCK_EX, this);
       		assert(rc == RCOK);
-		#elif CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC
+		#elif CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC || CC_ALG == TICTOC
       		// Unlocking new rows is done in validate_*() to initialize row TID.
       		(void)row;
 		#else
 			// Not implemented.
+			(void)row;
 			assert(false);
 		#endif
     	}
@@ -522,6 +526,8 @@ bool txn_man::insert_row(row_t * &row, table_t * table, int part_id, uint64_t& o
 	row->manager->lock_insert(this, LOCK_EX);
 #elif CC_ALG == HLOCK
 	row->manager->lock_wr(this);
+#elif CC_ALG == TICTOC
+	row->manager->lock();
 #else
   // Not implemented.
   assert(false);
@@ -621,8 +627,10 @@ RC txn_man::finish(RC rc) {
 #elif CC_ALG == TICTOC
 	if (rc == RCOK)
 		rc = validate_tictoc();
-	else 
+	else {
+		rc = apply_index_changes(rc);
 		cleanup(rc);
+	}
 #elif CC_ALG == SILO
 	if (rc == RCOK) {
 		rc = validate_silo();

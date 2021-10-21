@@ -268,7 +268,16 @@ RC thread_t::run() {
 				rc = runTest(m_txn);
 			} else {
 				// starttime1 = get_server_clock();
+				if (stats._stats[0]->txn_cnt == 100 && get_thd_id() == 0) {
+					int sc;
+					// _wl->print = true;
+					// printf("thread 0 now run the 100th tx.\n");
+					// scanf("%d", &sc);
+					// _wl->print = false;
+					// sleep(100000);
+				}
 				rc = m_txn->run_txn(m_query);
+
 				// endtime1 = get_server_clock();
 			}
 #endif
@@ -403,9 +412,12 @@ RC thread_t::run() {
 		// DIS_STATS(get_thd_id(), lat_dis, timespan);
 		//stats.add_lat(get_thd_id(), timespan);
 		if (rc == RCOK) {
-			INC_STATS(get_thd_id(), txn_cnt, 1);
 			stats.commit(get_thd_id());
 			txn_cnt ++;
+			
+			stats._stats[get_thd_id()]->txn_cnt = txn_cnt;
+			// if (txn_cnt % 100000 == 0)
+			// 	printf("%lu, %lu, %p\n", txn_cnt, stats._stats[get_thd_id()]->txn_cnt, &(stats._stats[get_thd_id()]->txn_cnt));
 		} else if (rc == Abort) {
 			INC_STATS(get_thd_id(), time_abort, timespan);
 			INC_STATS(get_thd_id(), abort_cnt, 1);
@@ -426,6 +438,9 @@ RC thread_t::run() {
 	    //     if( !ATOM_CAS(_wl->sim_done, false, true) )
 		// 		assert( _wl->sim_done);
 	    // }
+		// if (_wl->print) {
+		// 	while (_wl->print) ;
+		// }
 	    if (_wl->sim_done) { 
    		    goto _end;
    		}

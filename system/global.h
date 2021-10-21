@@ -142,9 +142,9 @@ extern uint64_t waiting_2_abort_time_dis[1000];
 // #endif
 
 #if INTERACTIVE_MODE == 1
-static const char replicas[][32] = {"aep3"};
-static const std::string replicanames[] = {"10.0.2.132"};
-static const std::string clientname = "10.0.2.134";
+static const char replicas[][32] = {"aep2"};
+static const std::string replicanames[] = {"10.0.2.131"};
+static const std::string clientname = "10.0.2.130";
 static constexpr uint16_t kUDPPortBase = 31850;
 static constexpr uint8_t kReadType = 2;
 static constexpr uint8_t kWriteType = 3;

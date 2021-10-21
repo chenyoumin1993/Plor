@@ -108,7 +108,7 @@ RC tpcc_wl::init_table() {
 //		- order line
 /**********************************/
 	tpcc_buffer = new drand48_data * [g_thread_cnt];
-	for (int i = 0; i < g_thread_cnt; ++i) {
+	for (uint32_t i = 0; i < g_thread_cnt; ++i) {
 		tpcc_buffer[i] = (drand48_data *) _mm_malloc(sizeof(drand48_data), 64);
 		srand48_r(i + 1, tpcc_buffer[i]);
 	}

@@ -117,6 +117,7 @@ void ycsb_query::gen_requests(uint64_t thd_id, workload * h_wl) {
 	if (is_rotx)
 		total_req_cnt = g_req_per_query;
 #else
+	(void)is_rotx;
 	if (rnd < SMALL_RATIO) {
 		total_req_cnt = 4;
 	} else {

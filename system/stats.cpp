@@ -263,11 +263,11 @@ void Stats::print() {
 	); */
 	
 	// printf("%.2f\t", (double)(total_txn_cnt * actual_thd_cnt) / (total_run_time / BILLION));
-	
+
 	// print_dis();
 
-	if (g_prt_lat_distr)
-		print_lat_distr(0);
+	// if (g_prt_lat_distr)
+	print_lat_distr(0);
 
 	// print_lat_distr(5);
 	// printf("\n");
@@ -321,13 +321,18 @@ void Stats::print_lat_distr(int off) {
 		}
 	}
 
+	printf("\n");
+	for (int i = 0; i < MAX_LAT; ++i)
+		printf("%d\t", total_lat_dis[i]);
+	printf("\n");
+
 	double tmp_cnt = 0;
 	bool p_50 = false, /*p_90 = false, p_95 = false,*/ p_99 = false, p_999 = false, p_max = false;
-	int p_max_lat = 0;
+	// int p_max_lat = 0;
 	for (int i = 0; i < MAX_LAT; ++i) {
 		tmp_cnt += (double)total_lat_dis[i];
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
-			printf ("%d(LAT@P50)\t", i);
+			printf ("LAT@P50\t%d\t", i);
 			p_50 = true;
 		}
 		// if (tmp_cnt / total_cnt > 0.9 && p_90 == false) {
@@ -339,17 +344,17 @@ void Stats::print_lat_distr(int off) {
 		// 	p_95 = true;
 		// }
 		if (tmp_cnt / total_cnt > 0.99 && p_99 == false) {
-			printf ("%d(LAT@P99)\t", i);
+			printf ("LAT@P99\t%d\t", i);
 			p_99 = true;
 		}
 		if (tmp_cnt / total_cnt > 0.999 && p_999 == false) {
-			printf ("%d(LAT@P999)\t", i);
+			printf ("LAT@P999\t%d\t", i);
 			p_999 = true;
 		} 
 		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
-			printf ("%d(LAT@P9999)\t", i);
+			// printf ("LAT@P9999\t%d\t", i);
 			p_max = true;
-			p_max_lat = i;
+			// p_max_lat = i;
 		}
 	}
 
@@ -402,7 +407,7 @@ void Stats::performance(){
 		return;
 #endif
 	while (!start_perf) usleep(10);
-	// printf(".......%p\n", &(m_wl->sim_done));
+	
 	sleep(1);
 	uint64_t old_total_cnt, new_total_cnt;
 	ts_t start_time, end_time;
@@ -421,11 +426,11 @@ void Stats::performance(){
 
 	for (int i = 0; i < (int)g_thread_cnt; ++i)
 		new_total_cnt += _stats[i]->txn_cnt;
-	
-	end_time = get_sys_clock();
-	rate = (new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 
-	printf("%.2f(TP)\t", rate);
+	end_time = get_sys_clock();
+	rate = (uint64_t)(new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
+	// printf("%lu\n", (uint64_t)(new_total_cnt - old_total_cnt));
+	printf("%.2f\t", rate);
 	old_total_cnt = new_total_cnt;
 	// ProfilerStop();
 	// goto _start;

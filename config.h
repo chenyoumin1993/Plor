@@ -1,13 +1,13 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 36
-#define CC_ALG MOCC
-#define ZIPF_THETA 0.5
-#define READ_PERC 0.95
-#define WRITE_PERC .05
+#define CORE_CNT 20
+#define CC_ALG TICTOC
+#define ZIPF_THETA 0.99
+#define READ_PERC 0.5
+#define WRITE_PERC .5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
-#define WORKLOAD YCSB
+#define WORKLOAD TPCC
 
 #define CORO_CNT 1
 #define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
@@ -60,7 +60,7 @@
 #define WARMUP						0
 // YCSB or TPCC
 // print the transaction latency distribution
-#define PRT_LAT_DISTR					true	
+#define PRT_LAT_DISTR					false	
 #define STATS_ENABLE					true
 #define TIME_ENABLE					true
 #define MAX_LAT						100000

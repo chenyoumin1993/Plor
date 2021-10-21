@@ -5,7 +5,7 @@ public:
 	void init(uint64_t thd_id);
 	void clear();
 
-	char _pad2[CL_SIZE];
+	char _pad2[CL_SIZE*4];
 	uint64_t txn_cnt;
 	uint64_t abort_cnt;
 	double run_time;
@@ -51,7 +51,7 @@ public:
 	uint64_t latency;
 	uint64_t * all_debug1;
 	uint64_t * all_debug2;
-	char _pad[CL_SIZE];
+	char _pad[CL_SIZE*4];
 };
 
 class Stats_tmp {

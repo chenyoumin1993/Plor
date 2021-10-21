@@ -41,6 +41,7 @@ public:
 	int get_index_cnt(index_base *index);
 	
 	bool sim_done;
+	bool print = false;
 protected:
 	void index_insert(std::string index_name, uint64_t key, row_t * row);
 	void index_insert(index_base * index, uint64_t key, row_t * row, int64_t part_id = -1);

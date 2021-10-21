@@ -108,6 +108,7 @@ final:
 		last_try_exec_time = endtime - starttime;
 	// Execute the loose ends (validation in OCC, etc.)
 	rc = finish(rc);
+	
 	starttime = get_sys_clock();
 	if (PRINT_LAT_DEBUG && get_thd_id() == 0)
 		last_try_commit_time = starttime - endtime;

@@ -7,7 +7,7 @@ replace()
 # CC_AGS=(WAIT_DIE)
 # CC_AGS=(NO_WAIT WAIT_DIE WOUND_WAIT DLOCK HLOCK SILO)
 #MAX_THD=(1 4 8 12 16 20 24 28 32 36)
-CC_AGS=(MOCC)
+CC_AGS=(TICTOC)
 MAX_THD=(1 4 8 12 16 20 24 28 32 36)
 # MAX_THD=(20)
 #MAX_THD=(36 40 44 48 52 56 60 64)
@@ -16,7 +16,6 @@ replace 10 "#define WORKLOAD TPCC" config.h
 
 replace 38 "#define PERSISTENT_LOG 0" config.h
 echo "w/o log"
-printf "\tT\tCC\tTP\tP50\tP90\tP99\tP999\tAbt\n"
 # replace 171 "#define NUM_WH 1" config.h
 for cc in ${CC_AGS[@]}
 do
