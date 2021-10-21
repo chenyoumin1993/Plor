@@ -1,0 +1,9 @@
+[submodule "cityhash"]
+	path = cityhash
+	url = https://github.com/google/cityhash
+[submodule "silo"]
+	path = silo
+	url = https://github.com/stephentu/silo
+[submodule "eRPC"]
+	path = eRPC
+	url = https://github.com/erpc-io/eRPC
