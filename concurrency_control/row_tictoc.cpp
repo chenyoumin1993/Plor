@@ -39,8 +39,8 @@ Row_tictoc::access(txn_man * txn, TsType type, row_t * local_row)
 			PAUSE
 			v = _ts_word;
 		}
-		// local_row->copy(_row);
-		memcpy(local_row->data, _row->data, _row->get_tuple_size());
+		local_row->copy(_row);
+		// memcpy(local_row->data, _row->data, _row->get_tuple_size());
 		COMPILER_BARRIER
 		v2 = _ts_word;
   #if WRITE_PERMISSION_LOCK
@@ -76,7 +76,11 @@ Row_tictoc::write_data(row_t * data, ts_t wts)
   	v &= ~(RTS_MASK | WTS_MASK); // clear wts and rts.
 	v |= wts;
 	_ts_word = v;
+#if INTERACTIVE_MODE == 1
+	_row->remote_write(data);
+#else
 	_row->copy(data);
+#endif
   #if WRITE_PERMISSION_LOCK
 	_ts_word &= (~LOCK_BIT);
   #endif

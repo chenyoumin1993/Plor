@@ -613,6 +613,7 @@ void Row_dlock::poll_lock_state(txn_man *txn) {
     if (cur_owner == NULL) {
         assert(o.wound != 1);
         assert(o.tid == 0);
+        assert(bmpWr->isSet(txn->get_thd_id()));
         txn_man *txn_old = find_oldest(); // return NULL if empty. TBD...
         if (txn_old != txn) {
             // not myself.
@@ -647,14 +648,14 @@ void Row_dlock::poll_lock_state(txn_man *txn) {
 
 txn_man* Row_dlock::find_oldest() {
     txn_man *txn = NULL;
-    uint ts = -1;
+    uint64_t ts = 0;
     if (THREAD_CNT <= MAX_THREAD_ATOMIC) {
         if (bmpWr->isEmpty())
             return txn;
         for (int i = 0; i < THREAD_CNT; ++i) {
             if (bmpWr->isSet(i)) {
                 while (txn_tb[i] == NULL) ;
-                if (txn_tb[i]->get_ts() < ts) {
+                if ((txn_tb[i]->get_ts() < ts) || (ts == 0)) {
                     ts = txn_tb[i]->get_ts();
                     txn = txn_tb[i];
                 }

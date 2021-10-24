@@ -13,6 +13,7 @@
 #include "mem_alloc.h"
 #include "test.h"
 #include "tpcc.h"
+#include <atomic>
 
 #define CONFIG_H "silo/config/config-perf.h"
 #include "../silo/rcu.h"
@@ -36,6 +37,8 @@ char _pad1111[4096];
 txn_man *txn_tb[THREAD_CNT];
 __thread int mytid;
 char _pad2222[4096];
+
+std::atomic<int> start_perf(0);
 
 // extern thread_local int lock_cnt;
 
@@ -82,6 +85,7 @@ RC thread_t::run() {
 		}
 	}
 #endif
+	// enable the performance monitor: 
 #if !NOGRAPHITE
 	_thd_id = CarbonGetTileId();
 #endif
@@ -107,6 +111,8 @@ RC thread_t::run() {
 	base_query * m_query = NULL;
 	uint64_t thd_txn_id = 0;
 	UInt64 txn_cnt = 0;
+
+	start_perf ++;
 
 	while (true) {
 		ts_t starttime = get_sys_clock();
@@ -237,7 +243,11 @@ RC thread_t::run() {
 			#endif
 			} else {
 				// New TX, acquire the ts first.
+			#if RT_ENABLED == 1
+				m_txn->set_ts(m_query->deadline_time);
+			#else
 				m_txn->set_ts(get_next_ts());
+			#endif
 				m_query->timestamp = m_txn->get_ts();
 			}
 			asm volatile ("sfence" ::: "memory");

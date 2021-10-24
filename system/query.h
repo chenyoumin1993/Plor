@@ -15,10 +15,12 @@ public:
 	uint64_t * part_to_access;
 	ts_t start_time;
 	ts_t stop_time;
+	ts_t deadline_time = 0;
 	ts_t timestamp = 0;
 	uint64_t abort_cnt = 0;
 	uint64_t exec_time = 0;
 	uint64_t backoff = BACKOFF_CYCLE;
+	uint64_t request_cnt = 0;
 	bool readonly = false;
 	bool read_committed = false;
 	bool ro_print = false;
@@ -29,7 +31,7 @@ public:
 class Query_thd {
 public:
 	void init(workload * h_wl, int thread_id);
-	base_query * get_next_query(); 
+	base_query * get_next_query(uint64_t thd_id); 
 	int q_idx;
 	int _request_cnt;
 #if WORKLOAD == YCSB

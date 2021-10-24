@@ -2,6 +2,7 @@
 #include "row.h"
 #include "row_tictoc.h"
 #include "manager.h"
+#include "log.h"
 
 #if CC_ALG==TICTOC
 
@@ -13,6 +14,9 @@ txn_man::validate_tictoc()
 	int read_set[row_cnt - wr_cnt];
 	int cur_rd_idx = 0;
 	int cur_wr_idx = 0;
+	ts_t wait_start__ = 0, wait_end__ = 0;
+	wait_start__ = get_sys_clock();
+
 	for (int rid = 0; rid < row_cnt; rid ++) {
 		if (accesses[rid]->type == WR)
 			write_set[cur_wr_idx ++] = rid;
@@ -226,6 +230,13 @@ txn_man::validate_tictoc()
 final:
 	// if (read_committed)
 	// 	assert(rc == RCOK);
+
+	wait_end__ = get_sys_clock();
+
+	if (PRINT_LAT_DEBUG && get_thd_id() == 0) {
+        if (wait_start__ != 0 && wait_end__ != 0)
+    		last_waiting_time_1 += (wait_end__ - wait_start__); // ns
+	}
 
 	rc = apply_index_changes(rc);
 

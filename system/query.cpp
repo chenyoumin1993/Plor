@@ -83,7 +83,7 @@ Query_queue::get_next_query(uint64_t thd_id) {
 	__sync_fetch_and_add(&sig_new_req[thd_id][0], -1);
 
 #endif
-	base_query * query = all_queries[thd_id]->get_next_query();
+	base_query * query = all_queries[thd_id]->get_next_query(thd_id);
 	query->abort_cnt = 0;
 	return query;
 }
@@ -114,6 +114,7 @@ void
 Query_thd::init(workload * h_wl, int thread_id) {
 	uint64_t request_cnt;
 	q_idx = 0;
+	// thd_id = thread_id;
 	request_cnt = WARMUP / g_thread_cnt + MAX_TXN_PER_PART + 4;
 #if ABORT_BUFFER_ENABLE
     request_cnt += ABORT_BUFFER_SIZE;
@@ -138,9 +139,12 @@ Query_thd::init(workload * h_wl, int thread_id) {
 }
 
 base_query * 
-Query_thd::get_next_query() {
+Query_thd::get_next_query(uint64_t thd_id) {
 	base_query * query = &queries[q_idx++];
 	query->start_time = get_sys_clock();
+	assert(query->request_cnt != 0);
+	query->deadline_time = query->start_time + RS_FACTOR * query->request_cnt;
+	query->deadline_time = (query->deadline_time << 6) + thd_id;
 	if (q_idx >= _request_cnt) q_idx = 0;
 	if (query == NULL) printf("no requests......\n");
 	return query;

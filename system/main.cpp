@@ -34,7 +34,6 @@ thread_t ** m_thds;
 
 workload * m_wl;
 std::thread perf;
-bool start_perf = false;
 
 #if INTERACTIVE_MODE == 1
 #include "rpc.h"
@@ -182,7 +181,7 @@ int main(int argc, char* argv[])
 	finished = false;
 	pthread_create(&e, NULL, epoch, (void *)0);
 #endif
-	start_perf = true;
+	// start_perf = true;
 	for (uint32_t i = 0; i < CORE_CNT - 1; i++) {
 		uint64_t vid = i;
 		pthread_create(&p_thds[i], NULL, f, (void *)vid);

@@ -40,6 +40,7 @@ void tpcc_query::gen_payment(uint64_t thd_id) {
 
   read_committed = false;
   readonly = false;
+  request_cnt = 4;
 
   if (FIRST_PART_LOCAL) {
     if (g_num_wh <= g_thread_cnt)
@@ -157,6 +158,8 @@ void tpcc_query::gen_new_order(uint64_t thd_id) {
     if (j == part_num)  // not found! add to it.
       part_to_access[part_num++] = wh_to_part(arg.items[i].ol_supply_w_id);
   }
+
+  request_cnt = 8 + arg.ol_cnt;
   // "1% of new order gives wrong itemid"
   // We cannot do this because DBx1000 cannot distinguish user aborts from conflict aborts.
   // if (URand(0, 99, thd_id) == 0)
@@ -167,6 +170,7 @@ void tpcc_query::gen_order_status(uint64_t thd_id) {
   type = TPCC_ORDER_STATUS;
   readonly = false;
   read_committed = false;
+  request_cnt = 3;
   tpcc_query_order_status& arg = args.order_status;
 
   if (FIRST_PART_LOCAL) {
@@ -200,6 +204,7 @@ void tpcc_query::gen_stock_level(uint64_t thd_id) {
   type = TPCC_STOCK_LEVEL;
   readonly = false;
   read_committed = true;
+  request_cnt = 2;
   tpcc_query_stock_level& arg = args.stock_level;
 
   if (FIRST_PART_LOCAL) {
@@ -222,7 +227,7 @@ void tpcc_query::gen_stock_level(uint64_t thd_id) {
 void tpcc_query::gen_delivery(uint64_t thd_id) {
   type = TPCC_DELIVERY;
   tpcc_query_delivery& arg = args.delivery;
-
+  request_cnt = 60;
   read_committed = false;
   readonly = false;
 

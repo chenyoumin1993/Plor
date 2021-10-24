@@ -4,12 +4,13 @@
 #include "mem_alloc.h"
 #include "wl.h"
 #include <thread>
+#include <atomic>
 
 #define BILLION 1000000000UL
 
 extern workload *m_wl;
 extern std::thread perf;
-extern bool start_perf;
+extern std::atomic<int> start_perf;
 
 #if INTERACTIVE_MODE == 1
 extern bool is_storage_server;
@@ -321,14 +322,9 @@ void Stats::print_lat_distr(int off) {
 		}
 	}
 
-	printf("\n");
-	for (int i = 0; i < MAX_LAT; ++i)
-		printf("%d\t", total_lat_dis[i]);
-	printf("\n");
-
 	double tmp_cnt = 0;
 	bool p_50 = false, /*p_90 = false, p_95 = false,*/ p_99 = false, p_999 = false, p_max = false;
-	// int p_max_lat = 0;
+	int p_max_lat = 0;
 	for (int i = 0; i < MAX_LAT; ++i) {
 		tmp_cnt += (double)total_lat_dis[i];
 		if (tmp_cnt / total_cnt > 0.5 && p_50 == false) {
@@ -354,7 +350,7 @@ void Stats::print_lat_distr(int off) {
 		if (tmp_cnt / total_cnt >= 0.9999 && p_max == false) {
 			// printf ("LAT@P9999\t%d\t", i);
 			p_max = true;
-			// p_max_lat = i;
+			p_max_lat = i;
 		}
 	}
 
@@ -403,19 +399,22 @@ void Stats::print_lat_distr(int off) {
 
 void Stats::performance(){
 #if INTERACTIVE_MODE == 1
-	if (is_storage_server)
+	if (is_storage_server) {
+		// printf("storage server, return.\n");
 		return;
+	}
 #endif
-	while (!start_perf) usleep(10);
-	
-	sleep(1);
+	while (start_perf != g_thread_cnt) usleep(10);
+	usleep(200);
 	uint64_t old_total_cnt, new_total_cnt;
 	ts_t start_time, end_time;
 	double rate;
 	old_total_cnt = new_total_cnt = 0;
 
-	for (int i = 0; i < (int)g_thread_cnt; ++i)
+	for (int i = 0; i < (int)g_thread_cnt; ++i) {
+		// printf("i = %d\n", i);
 		old_total_cnt += _stats[i]->txn_cnt;
+	}
 
 // _start:
 	// ProfilerStart("profile/prof");

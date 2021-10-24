@@ -1,10 +1,10 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#define CORE_CNT 20
-#define CC_ALG TICTOC
+#define CORE_CNT 36
+#define CC_ALG DLOCK
 #define ZIPF_THETA 0.99
 #define READ_PERC 0.5
-#define WRITE_PERC .5
+#define WRITE_PERC 0.5
 #define USE_SPINLOCK 0
 #define ATOMIC_WORD true
 #define WORKLOAD TPCC
@@ -34,14 +34,14 @@
 #define VALVE_CNT 1 // equal to the number of sockets.
 // How fast to issue requests.
 #define VALVE_TP 10000000
-
+// 2: UNDO; 1: REDO
 #define PERSISTENT_LOG 0
 
 #define TS_OPT 0
-
+#define RT_ENABLED 0
 #define YCSB_RO_TEST 0
 #define YCSB_RO_RATIO 0.1
-
+#define RS_FACTOR 10000
 // #define DEBUG_WOUND 1
 
 // 
@@ -54,7 +54,7 @@
 #define PAGE_SIZE					4096 
 #define CL_SIZE						64
 // CPU_FREQ is used to get accurate timing info 
-#define CPU_FREQ 					2.4 	// in GHz/s
+#define CPU_FREQ 					3 	// in GHz/s
 
 // # of transactions to run for warmup
 #define WARMUP						0
