@@ -355,10 +355,10 @@ void Stats::print_lat_distr(int off) {
 	}
 
 	// printf("\n");
-	// for (int i = 0; i <= p_max_lat; ++i) {
-	// 	printf("%d\t", total_lat_dis[i]);
-	// }
-	// printf("\n");
+	// printf(for (int i = 0; i <= p_max_lat; ++i) {
+	// printf(	printf("%d\t", total_lat_dis[i]);
+	// printf(}
+	// printf(printf("\n");
 
 	double abt_cnt = 0;
 	p_50 = false;
