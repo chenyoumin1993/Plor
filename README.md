@@ -5,7 +5,7 @@ Plor is based on DBx1000, which is a single node OLTP database management system
 
 Download
 ------------
-	git clone --recursive https://github.com/chenyoumin1993/Ltx
+	git clone --recursive https://github.com/chenyoumin1993/Plor
 
 Dependencies
 ------------
