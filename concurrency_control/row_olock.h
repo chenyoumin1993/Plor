@@ -21,18 +21,8 @@ struct OLockEntry {
 	};
 };
 
-#if CC_ALG == OLOCK
-struct Owner {
-    union {
-        struct {
-            uint64_t _owner:63;
-            uint64_t wound:1;
-        };
-        txn_man *owner;
-    };
-};
 
-#elif CC_ALG == DLOCK
+#if CC_ALG == PLOR
 
 struct __attribute__((packed)) Owner {
     union {
@@ -369,29 +359,8 @@ inline void unset_mark(uint64_t *addr) {
 		*addr -= 0x1ull;
 }
 
-#if CC_ALG == OLOCK
 
-class Row_olock {
-public:
-    void init(row_t *row);
-    RC lock_get(lock_t type, txn_man *txn);
-    RC lock_release(lock_t type, txn_man *txn);
-    void poll_lock_state(txn_man *txn);
-
-private:
-    // ...
-    row_t *_row;
-    Owner owner; // Only the owner can remove itself.
-    OLockEntry *waiters;
-    uint8_t wound;
-    txn_man *last_unset;
-    void insert(OLockEntry *);
-    void remove(txn_man *);
-    txn_man* find_oldest();
-    // boost::lockfree::queue<uint64_t, boost::lockfree::capacity<400>> queue;
-};
-
-#elif CC_ALG == DLOCK
+#if CC_ALG == PLOR
 
 class Row_dlock {
 public:
@@ -434,13 +403,13 @@ private:
     RC lock_release_ex(lock_t type, txn_man *txn);
 
     void mtx_get() {
-    #if DLOCK_LOCKFREE == 0
+    #if PLOR_LOCKFREE == 0
         mtx.lock();
     #endif
     }
     
     void mtx_release() {
-    #if DLOCK_LOCKFREE == 0
+    #if PLOR_LOCKFREE == 0
         mtx.unlock();
     #endif
     }

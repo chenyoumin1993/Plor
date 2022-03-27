@@ -73,7 +73,7 @@ void row_t::init_manager(row_t * row) {
     manager = (Row_lock *) mem_allocator.alloc(sizeof(Row_lock), _part_id);
 #elif CC_ALG == OLOCK
 	manager = (Row_olock *) mem_allocator.alloc(sizeof(Row_dlock), _part_id);
-#elif CC_ALG == DLOCK
+#elif CC_ALG == PLOR
 	manager = (Row_dlock *) mem_allocator.alloc(sizeof(Row_dlock), _part_id);
 #elif CC_ALG == TIMESTAMP
     manager = (Row_ts *) mem_allocator.alloc(sizeof(Row_ts), _part_id);
@@ -249,7 +249,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	txn->conflict_type = 0;
 	if (txn->wound)
 		return Abort;
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == PLOR
 	if (txn->read_committed)
 		txn->wound = false; // I just read, you don't need to kill me.
 	uint64_t thd_id = txn->get_thd_id();
@@ -263,16 +263,16 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 	rc = this->manager->lock_get(lt, txn);
 #endif
 
-	if (txn->read_committed && CC_ALG == DLOCK && rc != RCOK) {
+	if (txn->read_committed && CC_ALG == PLOR && rc != RCOK) {
 		std::cout << txn->wound << std::endl;
 		assert(rc == RCOK);
 	}
 
 	if (rc == RCOK) {
 	#if INTERACTIVE_MODE == 0
-		if (CC_ALG != DLOCK) {
+		if (CC_ALG != PLOR) {
 			row = this;
-		} else { // DLOCK w/ one-shot TX mode
+		} else { // PLOR w/ one-shot TX mode
 			if (type == WR) {
 				row->copy(this);
 			} else {
@@ -294,10 +294,10 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		}
 	} else if (rc == Abort) {} 
 	else if (rc == WAIT) {
-		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK);
+		ASSERT(CC_ALG == WAIT_DIE || CC_ALG == DL_DETECT || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == PLOR);
 		// if (CC_ALG == WOUND_WAIT || CC_ALG == WAIT_DIE) {
 		// 	assert(txn->conflict_type != 0);
-		if (CC_ALG == DLOCK) {
+		if (CC_ALG == PLOR) {
 			assert(txn->conflict_type == 2);
 		}
 		uint64_t starttime = get_sys_clock();
@@ -313,7 +313,7 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 			continue;
 #elif CC_ALG == WOUND_WAIT
 			continue;
-#elif CC_ALG == OLOCK || CC_ALG == DLOCK
+#elif CC_ALG == OLOCK || CC_ALG == PLOR
 			this->manager->poll_lock_state(txn);
 			continue;
 #elif CC_ALG == DL_DETECT
@@ -390,9 +390,9 @@ RC row_t::get_row(access_t type, txn_man * txn, row_t *& row) {
 		endtime = get_sys_clock();
 		INC_TMP_STATS(thd_id, time_wait, endtime - starttime);
 	#if INTERACTIVE_MODE == 0
-		if (CC_ALG != DLOCK) {
+		if (CC_ALG != PLOR) {
 			row = this;
-		} else if (rc == RCOK) { // DLOCK w/ one-shot mode.
+		} else if (rc == RCOK) { // PLOR w/ one-shot mode.
 			if (type == WR) {
 				row->copy(this);
 			} else {
@@ -499,7 +499,7 @@ void row_t::return_row(access_t type, txn_man * txn, row_t * row) {
 
 	this->manager->lock_release(lt, txn);
 
-#elif CC_ALG == DLOCK
+#elif CC_ALG == PLOR
 	lock_t lt = (type == WR || type == XP) ? (lock_t)LOCK_EX : (lock_t)LOCK_SH;
 	if (type == WR && row) {
 		// commit data.

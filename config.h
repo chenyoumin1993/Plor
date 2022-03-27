@@ -10,7 +10,7 @@
 #define WORKLOAD YCSB
 
 #define CORO_CNT 1
-#define MAX_THREAD_ATOMIC 64 // help to choose the right solution in DLOCK.
+#define MAX_THREAD_ATOMIC 64 // help to choose the right solution in PLOR.
 
 #define PENALTY_POLICY 1
 #define EPOCH_LENGTH 1000
@@ -136,7 +136,7 @@
 #define HSTORE_LOCAL_TS				false
 // [VLL] 
 #define TXN_QUEUE_SIZE_LIMIT		THREAD_CNT
-// [DLOCK]
+// [PLOR]
 #define EX_MODE 0x1314
 
 /***********************************************/
@@ -177,7 +177,7 @@
 #define TPCC_NP false
 
 #define SMALL_RATIO 0.9
-#define DLOCK_LOCKFREE 1
+#define PLOR_LOCKFREE 1
 //
 enum TPCCTxnType {TPCC_ALL, 
 				TPCC_PAYMENT, 
@@ -251,8 +251,8 @@ extern TestCases					g_test_case;
 #define VLL							10
 #define HEKATON 					11
 #define WOUND_WAIT					12
-#define OLOCK						13
-#define DLOCK						14
+// #define OLOCK						13
+#define PLOR						14
 #define HLOCK						15
 #define MOCC						16
 

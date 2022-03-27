@@ -205,7 +205,7 @@ RC thread_t::run() {
 		m_txn->abort_cnt = 0;
 		// if (m_txn->wound_cnt % 10000 == 0)
 		// 	printf("%d - %d\n", m_txn->get_thd_id(), m_txn->wound_cnt);
-		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK || CC_ALG == HLOCK) {
+		if (CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == PLOR || CC_ALG == HLOCK) {
 		#ifdef DEBUG_WOUND
 			if (m_txn->wound) m_txn->wound_cnt += 1;
 			m_txn->last_wound = 0;
@@ -232,7 +232,7 @@ RC thread_t::run() {
 				|| CC_ALG == HEKATON
 				|| CC_ALG == TIMESTAMP) 
 			m_txn->set_ts(get_next_ts());
-		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == DLOCK || CC_ALG == HLOCK) {
+		if (CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == OLOCK || CC_ALG == PLOR || CC_ALG == HLOCK) {
 			if (m_query->timestamp != 0) {
 				// This is an aborted TX.
 			#if TS_OPT == 0
@@ -334,7 +334,7 @@ RC thread_t::run() {
 					m_query->backoff <<= 1;
 				// wait cycles.
 				uint64_t cycles_to_wait = (m_query->backoff == 0) ? 0 : rand_r(&seed) % m_query->backoff;
-				if (CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == SILO || CC_ALG == MOCC)
+				if (CC_ALG == PLOR || CC_ALG == HLOCK || CC_ALG == SILO || CC_ALG == MOCC)
 					cycles_to_wait = (m_query->readonly) ? 100 : cycles_to_wait;
 				// double r;
 				// drand48_r(&buffer, &r);

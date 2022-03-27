@@ -240,7 +240,7 @@ void txn_man::cleanup(RC rc) {
 	return;
 #endif
 
-#if PERSISTENT_LOG == 1 && (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK || CC_ALG == OLOCK)
+#if PERSISTENT_LOG == 1 && (CC_ALG == NO_WAIT || CC_ALG == WAIT_DIE || CC_ALG == WOUND_WAIT || CC_ALG == PLOR || CC_ALG == OLOCK)
 	if (rc != Abort && !readonly && !read_committed) {
 		// Log TX Begin.
 		log->log_tx_meta(get_txn_id(), wr_cnt + rdwr_cnt);
@@ -254,7 +254,7 @@ void txn_man::cleanup(RC rc) {
 	}
 #endif
 
-	if (CC_ALG == OLOCK || CC_ALG == DLOCK)
+	if (CC_ALG == OLOCK || CC_ALG == PLOR)
 		this->ex_mode = true;
 	
 	for (int rid = row_cnt - 1; rid >= 0; rid --) {
@@ -292,7 +292,7 @@ void txn_man::cleanup(RC rc) {
 			orig_r->return_row(type, this, accesses[rid]->data);
 		}
 
-#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && CC_ALG != DLOCK && CC_ALG != MOCC && INTERACTIVE_MODE == 0
+#if CC_ALG != TICTOC && CC_ALG != SILO && CC_ALG != HLOCK && CC_ALG != PLOR && CC_ALG != MOCC && INTERACTIVE_MODE == 0
 		accesses[rid]->data = NULL;
 #endif
 	}
@@ -304,7 +304,7 @@ void txn_man::cleanup(RC rc) {
 		
 			asm volatile ("sfence" ::: "memory");
 
-		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK
+		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == PLOR
 			auto rc = row->manager->lock_release((lock_t)LOCK_EX, this);
 			assert(rc == RCOK);
 		#elif CC_ALG == SILO
@@ -327,7 +327,7 @@ void txn_man::cleanup(RC rc) {
 	} else if (!readonly && !read_committed) {
 		for (UInt32 i = 0; i < insert_cnt; i ++) {
 			row_t * row = insert_rows[i];
-		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK
+		#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == PLOR
       		auto rc = row->manager->lock_release((lock_t)LOCK_EX, this);
       		assert(rc == RCOK);
 		#elif CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == MOCC || CC_ALG == TICTOC
@@ -391,7 +391,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	if (accesses[row_cnt] == NULL) {
 		Access * access = (Access *) _mm_malloc(sizeof(Access), 64);
 		accesses[row_cnt] = access;
-#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == DLOCK || CC_ALG == HLOCK || CC_ALG == MOCC)
+#if (CC_ALG == SILO || CC_ALG == TICTOC || CC_ALG == PLOR || CC_ALG == HLOCK || CC_ALG == MOCC)
 		access->data = (row_t *) _mm_malloc(sizeof(row_t), 64);
 		access->data->init(MAX_TUPLE_SIZE);
 		access->orig_data = (row_t *) _mm_malloc(sizeof(row_t), 64);
@@ -411,7 +411,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	Create a local copy in *data* if necessary.
 	Locks are acquired here, except OCC (validate in cleanup).
 	*/
-#if INTERACTIVE_MODE == 0 && (CC_ALG == DLOCK || CC_ALG == HLOCK)
+#if INTERACTIVE_MODE == 0 && (CC_ALG == PLOR || CC_ALG == HLOCK)
 	if (accesses[row_cnt]->data->data_bak != NULL) {
 		// access has been used for read, *data point to a invalid location.
 		accesses[row_cnt]->data->unref();
@@ -435,7 +435,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 		assert(false);
 
 	// if (accesses[row_cnt]->data != NULL && accesses[row_cnt]->data->table == NULL) {
-	// 	// it can be NULL: for interactive mode or in DLOCK.
+	// 	// it can be NULL: for interactive mode or in PLOR.
 	// 	accesses[row_cnt]->data->set_primary_key(row->get_primary_key());
 	// 	accesses[row_cnt]->data->table = row->get_table();
 	// }
@@ -476,7 +476,7 @@ row_t * txn_man::get_row(row_t * row, access_t type) {
 	accesses[row_cnt]->history_entry = history_entry;
 #endif
 
-#if CC_ALG == HLOCK || CC_ALG == DLOCK
+#if CC_ALG == HLOCK || CC_ALG == PLOR
 	accesses[row_cnt]->tid = row->get_version();
 #endif
 
@@ -517,7 +517,7 @@ bool txn_man::insert_row(row_t * &row, table_t * table, int part_id, uint64_t& o
 	if (table->get_new_row(row, part_id, out_row_id) != RCOK) return false;
 	assert(insert_cnt < MAX_ROW_PER_TXN);
 	insert_rows[insert_cnt ++] = row;
-#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == DLOCK
+#if CC_ALG == WAIT_DIE || CC_ALG == NO_WAIT || CC_ALG == WOUND_WAIT || CC_ALG == PLOR
 	auto rc = row->manager->lock_get((lock_t)LOCK_EX, this);
   	assert(rc == RCOK);
 #elif CC_ALG == SILO
@@ -645,7 +645,7 @@ RC txn_man::finish(RC rc) {
 		rc = apply_index_changes(rc);
 		cleanup(rc);
 	} 
-#elif CC_ALG == DLOCK
+#elif CC_ALG == PLOR
 	if (rc == RCOK && !readonly && !read_committed) {
 		ts_t wait_start = get_sys_clock();
 		// validate all the rows with write locks.

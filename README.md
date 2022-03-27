@@ -3,6 +3,10 @@ Plor (general transactions with predictable, low tail latency)
 
 Plor is based on DBx1000, which is a single node OLTP database management system (DBMS).
 
+Download
+------------
+	git clone --recursive https://github.com/chenyoumin1993/Ltx
+
 Dependencies
 ------------
 	# for jemalloc 
@@ -33,10 +37,8 @@ DBMS configurations can be changed in the config.h file. Please refer to README 
 
 	CORE_CNT        : Number of worker threads running in the database.
 	WORKLOAD          : Supported workloads include YCSB and TPCC
-	CC_ALG            : Concurrency control algorithm. Seven algorithms are supported (NO_WAIT WAIT_DIE WOUND_WAIT DLOCK HLOCK SILO MOCC)
-	# DLOCK --- baseline Plor
-	# HLOCK --- *delayed write-lock acquisition* enabled
-	 
+	CC_ALG            : Concurrency control algorithm. Seven algorithms are supported (NO_WAIT WAIT_DIE WOUND_WAIT PLOR HLOCK SILO MOCC)
+
                         
 Run
 ---
@@ -48,6 +50,6 @@ The DBMS can be run with
 
 Output
 -------------
-	N(TP): throughput
-	N(LAT@P99): 99th percentile latency
-	N(ABT@P99): 99th percentile abort count
+	TP: throughput
+	LAT@P99: 99th percentile latency
+	ABT@P99: 99th percentile abort count

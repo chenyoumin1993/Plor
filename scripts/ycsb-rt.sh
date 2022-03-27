@@ -4,7 +4,7 @@ replace()
 	sed -i "$1s/.*/$2/" $3
 }
 
-CC_AGS=(DLOCK)
+CC_AGS=(PLOR)
 MAX_THD=(1 4 8 12 16 20 24 28 32 36)
 RT=(5000)
 

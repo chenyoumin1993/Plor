@@ -29,7 +29,7 @@ public:
 #if CC_ALG == TICTOC
 	ts_t 		wts;
 	ts_t 		rts;
-#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == DLOCK || CC_ALG == MOCC)
+#elif (CC_ALG == SILO || CC_ALG == HLOCK || CC_ALG == PLOR || CC_ALG == MOCC)
 	ts_t 		tid;
 	ts_t 		epoch;
 #elif CC_ALG == HEKATON

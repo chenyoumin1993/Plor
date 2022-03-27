@@ -429,7 +429,7 @@ void Stats::performance(){
 	end_time = get_sys_clock();
 	rate = (uint64_t)(new_total_cnt - old_total_cnt) / ((double)(end_time - start_time) / 1000000000);
 	// printf("%lu\n", (uint64_t)(new_total_cnt - old_total_cnt));
-	printf("%.2f\t", rate);
+	printf("TP\t%.2f\t", rate);
 	old_total_cnt = new_total_cnt;
 	// ProfilerStop();
 	// goto _start;

@@ -101,7 +101,7 @@ public:
     Row_lock * manager;
   #elif CC_ALG == OLOCK
 	Row_olock * manager;  
-  #elif CC_ALG == DLOCK
+  #elif CC_ALG == PLOR
 	Row_dlock * manager;
   #elif CC_ALG == HLOCK
 	Row_hlock * manager;
